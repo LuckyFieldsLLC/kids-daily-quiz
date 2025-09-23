@@ -13,14 +13,19 @@ const getDbPool = (event: HandlerEvent): Pool => {
   if (netlifyDbUrl) {
     return new Pool({ connectionString: netlifyDbUrl });
   }
-  throw new Error('Database connection string is not configured. Please set NETLIFY_DATABASE_URL or provide a custom URL.');
+  throw new Error(
+    'Database connection string is not configured. Please set NETLIFY_DATABASE_URL or provide a custom URL.'
+  );
 };
 
 // --- Inlined from _sheets-client.ts ---
 const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 const SHEETS_DEFAULT_RANGE = 'Sheet1!A:I';
 
-interface SheetsAuth { apiKey: string; sheetId: string; }
+interface SheetsAuth {
+  apiKey: string;
+  sheetId: string;
+}
 
 const getSheetsAuth = (event: HandlerEvent): SheetsAuth => {
   const apiKey = event.headers['x-google-api-key'];
@@ -56,7 +61,7 @@ const rowToQuiz = (row: string[]): Quiz | null => {
       fun_level: parseInt(row[8], 10) || 2,
     };
   } catch (e) {
-    console.error("Failed to parse row:", row, e);
+    console.error('Failed to parse row:', row, e);
     return null;
   }
 };
@@ -85,12 +90,15 @@ const handleSheetsFetch = async (event: HandlerEvent) => {
 
 // --- Netlify Blobs Logic ---
 const handleBlobsFetch = async () => {
-  const store = getStore({ name: 'quizzes' }); // ✅ 修正ポイント
+  const store = getStore({
+    name: 'quizzes',
+    siteID: process.env.BLOBS_SITE_ID,   // 👈 必要なら Netlify ダッシュボードに設定
+    token: process.env.BLOBS_TOKEN,     // 👈 必要なら Netlify ダッシュボードに設定
+  });
+
   const { blobs } = await store.list();
   const quizzes = await Promise.all(
-    blobs.map(async (blob) => {
-      return await store.get(blob.key, { type: 'json' });
-    })
+    blobs.map(blob => store.get(blob.key, { type: 'json' }))
   );
   quizzes.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return {
@@ -121,7 +129,7 @@ export const handler: Handler = async (event) => {
       headers: { 'Content-Type': 'application/json' },
     };
   } catch (error: any) {
-    console.error("Error fetching quizzes:", error);
+    console.error('Error fetching quizzes:', error);
     return {
       statusCode: 500,
       body: JSON.stringify({ message: 'Failed to fetch quizzes.', error: error.message }),
