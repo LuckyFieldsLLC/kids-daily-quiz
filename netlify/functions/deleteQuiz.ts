@@ -45,11 +45,11 @@ const handleDbDelete = async (event: HandlerEvent) => {
   if (!id) {
     return { statusCode: 400, body: JSON.stringify({ message: 'Quiz ID is required for deletion.' }) };
   }
-  
+
   const pool = getDbPool(event);
   const sql = `DELETE FROM quizzes WHERE id = $1`;
   const result = await pool.query(sql, [id]);
-  
+
   if (result.rowCount === 0) {
     return { statusCode: 404, body: JSON.stringify({ message: 'Quiz not found for deletion.' }) };
   }
@@ -70,7 +70,7 @@ const handleSheetsDelete = async (event: HandlerEvent) => {
   if (rowIndex === -1) {
     return { statusCode: 404, body: JSON.stringify({ message: 'Quiz not found' }) };
   }
-  
+
   const sheetRowNumber = rowIndex + 1;
   const range = `Sheet1!A${sheetRowNumber}:I${sheetRowNumber}`;
 
@@ -94,7 +94,13 @@ const handleBlobsDelete = async (event: HandlerEvent) => {
   if (!id) {
     return { statusCode: 400, body: JSON.stringify({ message: 'ID is required' }) };
   }
-  const store = getStore('quizzes');
+
+  const store = getStore({
+    name: 'quizzes',
+    siteID: process.env.BLOBS_SITE_ID, // ✅ 環境変数で指定
+    token: process.env.BLOBS_TOKEN,   // ✅ 環境変数で指定
+  });
+
   await store.delete(id.toString());
   return { statusCode: 200, body: JSON.stringify({ message: 'Quiz deleted successfully' }) };
 };
@@ -104,7 +110,7 @@ export default async (event: HandlerEvent) => {
   if (event.httpMethod !== 'DELETE') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
-  
+
   const storageMode = event.headers['x-storage-mode'];
 
   try {
@@ -122,9 +128,10 @@ export default async (event: HandlerEvent) => {
     };
   } catch (error: any) {
     console.error("Error deleting quiz:", error);
-    return { 
-      statusCode: 500, 
-      body: JSON.stringify({ message: 'Failed to delete quiz.', error: error.message }) 
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ message: 'Failed to delete quiz.', error: error.message }),
     };
   }
 };
+
