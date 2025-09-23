@@ -14,14 +14,19 @@ const getDbPool = (event: HandlerEvent): Pool => {
   if (netlifyDbUrl) {
     return new Pool({ connectionString: netlifyDbUrl });
   }
-  throw new Error('Database connection string is not configured.');
+  throw new Error(
+    'Database connection string is not configured. Please set NETLIFY_DATABASE_URL or provide a custom URL.'
+  );
 };
 
 // --- Inlined from _sheets-client.ts ---
 const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 const SHEETS_DEFAULT_RANGE = 'Sheet1';
 
-interface SheetsAuth { apiKey: string; sheetId: string; }
+interface SheetsAuth {
+  apiKey: string;
+  sheetId: string;
+}
 
 const getSheetsAuth = (event: HandlerEvent): SheetsAuth => {
   const apiKey = event.headers['x-google-api-key'];
@@ -47,19 +52,29 @@ const quizToRow = (quiz: Partial<Quiz>): string[] => {
 
 // --- DB Logic ---
 const handleDbCreate = async (event: HandlerEvent) => {
-  const { question, options, answer, is_active, difficulty, fun_level } = JSON.parse(event.body || '{}');
+  const { question, options, answer, is_active, difficulty, fun_level } = JSON.parse(
+    event.body || '{}'
+  );
 
   if (!question || !Array.isArray(options) || options.length === 0 || !answer) {
     return { statusCode: 400, body: JSON.stringify({ message: 'Invalid quiz data provided.' }) };
   }
-  
+
   const pool = getDbPool(event);
   const sql = `
-    INSERT INTO quizzes (question, options, answer, is_active, difficulty, fun_level) 
-    VALUES ($1, $2, $3, $4, $5, $6) 
-    RETURNING *`;
-  
-  const values = [question, JSON.stringify(options), answer, is_active ?? true, difficulty ?? 2, fun_level ?? 2];
+        INSERT INTO quizzes (question, options, answer, is_active, difficulty, fun_level) 
+        VALUES ($1, $2, $3, $4, $5, $6) 
+        RETURNING *`;
+
+  const values = [
+    question,
+    JSON.stringify(options),
+    answer,
+    is_active ?? true,
+    difficulty ?? 2,
+    fun_level ?? 2,
+  ];
+
   const { rows } = await pool.query(sql, values);
   return { statusCode: 201, body: JSON.stringify(rows[0]) };
 };
@@ -75,7 +90,7 @@ const handleSheetsCreate = async (event: HandlerEvent) => {
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  
+
   const newRow = quizToRow(newQuiz);
   const appendUrl = `${SHEETS_API_URL}/${auth.sheetId}/values/${SHEETS_DEFAULT_RANGE}:append?valueInputOption=USER_ENTERED&key=${auth.apiKey}`;
 
@@ -95,8 +110,12 @@ const handleSheetsCreate = async (event: HandlerEvent) => {
 // --- Netlify Blobs Logic ---
 const handleBlobsCreate = async (event: HandlerEvent) => {
   const quizData = JSON.parse(event.body || '{}') as NewQuiz;
-  const store = getStore('quizzes');
-  
+  const store = getStore({
+    name: 'quizzes',
+    siteID: process.env.BLOBS_SITE_ID, // ✅ 環境変数で指定
+    token: process.env.BLOBS_TOKEN,   // ✅ 環境変数で指定
+  });
+
   const newQuiz: Quiz = {
     ...quizData,
     id: randomUUID(),
@@ -116,7 +135,7 @@ export default async (event: HandlerEvent) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
-  
+
   const storageMode = event.headers['x-storage-mode'];
 
   try {
@@ -133,10 +152,10 @@ export default async (event: HandlerEvent) => {
       headers: { 'Content-Type': 'application/json' },
     };
   } catch (error: any) {
-    console.error("Error creating quiz:", error);
-    return { 
-      statusCode: 500, 
-      body: JSON.stringify({ message: 'Failed to create quiz.', error: error.message }) 
+    console.error('Error creating quiz:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ message: 'Failed to create quiz.', error: error.message }),
     };
   }
 };
