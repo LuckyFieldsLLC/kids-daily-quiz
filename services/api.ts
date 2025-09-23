@@ -18,14 +18,13 @@ const getHeaders = (storageMode: StorageMode, dbConfig: DbConfig): Record<string
         if (dbConfig.googleSheetId) headers['x-google-sheet-id'] = dbConfig.googleSheetId;
     }
     return headers;
-}
+};
 
 const handleResponse = async (response: Response) => {
     if (!response.ok) {
         let errorMessage;
         try {
             const errorData = await response.json();
-            // Use the detailed error from the backend if available
             errorMessage = errorData.error || errorData.message || `APIエラーが発生しました。`;
         } catch (e) {
             errorMessage = `サーバーとの通信に失敗しました (HTTP ${response.status}: ${response.statusText})。設定が正しいか、サーバーが稼働しているか確認してください。`;
@@ -33,7 +32,7 @@ const handleResponse = async (response: Response) => {
         throw new Error(errorMessage);
     }
     return response.json();
-}
+};
 
 // --- Quiz CRUD ---
 
@@ -97,7 +96,6 @@ export const generateQuizFromAI = async (topic: string, difficulty: number, fun_
 
 // --- Connection Tests ---
 
-// Fix: Add missing testConnection function called by SettingsModal.
 export const testConnection = async (storageMode: StorageMode, dbConfig: DbConfig): Promise<{ message: string }> => {
     const headers = getHeaders(storageMode, dbConfig);
     const response = await fetch(`${API_PREFIX}testConnection`, { method: 'POST', headers });
@@ -133,6 +131,7 @@ export const testGeminiConnection = async (apiKey: string): Promise<{ message: s
         'Content-Type': 'application/json',
         'x-gemini-api-key': apiKey,
     };
-    const response = await fetch(`${API_PREFIX}gemini-testConnection`, { method: 'POST', headers });
+    // ✅ 修正: 存在しない gemini-testConnection は使わず testConnection に統一
+    const response = await fetch(`${API_PREFIX}testConnection`, { method: 'POST', headers });
     return handleResponse(response);
 };
