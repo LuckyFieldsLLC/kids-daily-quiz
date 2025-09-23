@@ -14,5 +14,5 @@
   NODE_VERSION = "20"
 
 # --- Netlify Blobs ストア定義 ---
-[[blobs]]
-  name = "quizzes"
+[blobs]
+  directories = ["quizzes"]
