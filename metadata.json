@@ -1,0 +1,5 @@
+{
+  "name": "Neon版 Kids Daily Knowledge Quiz",
+  "description": "An application for parents to generate a daily 7-question general knowledge quiz for their children, with adjustable difficulty levels for different age groups. Quizzes are created by Gemini and cover a wide range of topics, including mandatory questions on morals and current events.",
+  "requestFramePermissions": []
+}
