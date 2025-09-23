@@ -34,19 +34,7 @@ const getSheetData = async (auth: SheetsAuth) => {
   const response = await fetch(url);
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("Failed to fetch from Google Sheets:", errorText);
-    try {
-      const errorJson = JSON.parse(errorText);
-      const googleMessage = errorJson?.error?.message || 'Unknown Google API error.';
-      if (googleMessage.includes('API key not valid')) throw new Error('Google APIキーが無効です。キーが正しいか確認してください。');
-      if (googleMessage.includes('caller does not have permission')) throw new Error('スプレッドシートへのアクセス権限がありません。「リンクを知っている全員」の共有設定が「閲覧者」になっているか確認してください。');
-      if (googleMessage.includes('Unable to parse range')) throw new Error('スプレッドシートのシート名または範囲指定が無効です。シート名が「Sheet1」であることを確認してください。');
-      if (googleMessage.includes('Requested entity was not found')) throw new Error('スプレッドシートIDが見つかりません。IDが正しいか確認してください。');
-      throw new Error(`Google APIエラー: ${googleMessage}`);
-    } catch (e: any) {
-      if (e.message.startsWith('Google') || e.message.startsWith('スプレッドシート')) throw e;
-      throw new Error('Googleスプレッドシートからのデータ取得に失敗しました。設定内容を確認してください。');
-    }
+    throw new Error(`Google Sheets API Error: ${errorText}`);
   }
   const data = await response.json();
   return (data.values || []) as string[][];
@@ -96,11 +84,13 @@ const handleSheetsFetch = async (event: HandlerEvent) => {
 };
 
 // --- Netlify Blobs Logic ---
-const handleBlobsFetch = async (event: HandlerEvent) => {
-  const store = getStore('quizzes');
+const handleBlobsFetch = async () => {
+  const store = getStore({ name: 'quizzes' }); // ✅ 修正ポイント
   const { blobs } = await store.list();
   const quizzes = await Promise.all(
-    blobs.map(blob => store.get(blob.key, { type: 'json' }))
+    blobs.map(async (blob) => {
+      return await store.get(blob.key, { type: 'json' });
+    })
   );
   quizzes.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return {
@@ -120,7 +110,7 @@ export const handler: Handler = async (event) => {
   try {
     let result;
     if (storageMode === 'netlify-blobs') {
-      result = await handleBlobsFetch(event);
+      result = await handleBlobsFetch();
     } else if (storageMode === 'google-sheets') {
       result = await handleSheetsFetch(event);
     } else {
@@ -138,4 +128,3 @@ export const handler: Handler = async (event) => {
     };
   }
 };
-
