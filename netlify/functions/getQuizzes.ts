@@ -43,7 +43,7 @@ const getSheetData = async (auth: SheetsAuth) => {
       if (googleMessage.includes('Unable to parse range')) throw new Error('スプレッドシートのシート名または範囲指定が無効です。シート名が「Sheet1」であることを確認してください。');
       if (googleMessage.includes('Requested entity was not found')) throw new Error('スプレッドシートIDが見つかりません。IDが正しいか確認してください。');
       throw new Error(`Google APIエラー: ${googleMessage}`);
-    } catch(e: any) {
+    } catch (e: any) {
       if (e.message.startsWith('Google') || e.message.startsWith('スプレッドシート')) throw e;
       throw new Error('Googleスプレッドシートからのデータ取得に失敗しました。設定内容を確認してください。');
     }
@@ -73,9 +73,7 @@ const rowToQuiz = (row: string[]): Quiz | null => {
   }
 };
 
-// --- Original Function Logic ---
-
-// DB Logic
+// --- DB Logic ---
 const handleDbFetch = async (event: HandlerEvent) => {
   const pool = getDbPool(event);
   const { rows } = await pool.query('SELECT * FROM quizzes ORDER BY created_at DESC');
@@ -85,19 +83,19 @@ const handleDbFetch = async (event: HandlerEvent) => {
   };
 };
 
-// Sheets Logic
+// --- Sheets Logic ---
 const handleSheetsFetch = async (event: HandlerEvent) => {
   const auth = getSheetsAuth(event);
   const rows = await getSheetData(auth);
   const quizzes = rows.slice(1).map(rowToQuiz).filter(q => q !== null && q.id);
-  quizzes.sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
+  quizzes.sort((a, b) => new Date(b!.created_at!).getTime() - new Date(a!.created_at!).getTime());
   return {
     statusCode: 200,
     body: JSON.stringify(quizzes),
   };
 };
 
-// Netlify Blobs Logic
+// --- Netlify Blobs Logic ---
 const handleBlobsFetch = async (event: HandlerEvent) => {
   const store = getStore('quizzes');
   const { blobs } = await store.list();
@@ -111,7 +109,7 @@ const handleBlobsFetch = async (event: HandlerEvent) => {
   };
 };
 
-// --- Correct Netlify export ---
+// --- Entry Point ---
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -140,3 +138,4 @@ export const handler: Handler = async (event) => {
     };
   }
 };
+
