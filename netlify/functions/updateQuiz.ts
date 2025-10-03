@@ -1,7 +1,7 @@
+import type { NewQuiz, Quiz } from '../../types.js';
 import type { HandlerEvent } from '@netlify/functions';
-import { getStore } from '@netlify/blobs';
+import { getStore } from "./netlify-blobs-wrapper.js";
 import { Pool } from '@neondatabase/serverless';
-import type { Quiz } from '../../types';
 
 // --- Inlined from _db.ts ---
 const getDbPool = (event: HandlerEvent): Pool => {
@@ -113,23 +113,19 @@ const handleSheetsUpdate = async (event: HandlerEvent) => {
 // --- Netlify Blobs Logic ---
 const handleBlobsUpdate = async (event: HandlerEvent) => {
   const quizToUpdate = JSON.parse(event.body || '{}') as Quiz;
-  const store = getStore({
-    name: 'quizzes',
-    siteID: process.env.BLOBS_SITE_ID, // ✅ 環境変数で指定
-    token: process.env.BLOBS_TOKEN,   // ✅ 環境変数で指定
-  });
+  const store = getStore({ name: 'quizzes' });
 
-  const existingQuiz = await store.get(quizToUpdate.id.toString());
-  if (!existingQuiz) {
+  const existingRaw = await store.get(String(quizToUpdate.id));
+  if (!existingRaw) {
     return { statusCode: 404, body: JSON.stringify({ message: 'Quiz not found.' }) };
   }
-
+  const existingQuiz = JSON.parse(existingRaw) as Quiz;
   const updatedQuiz: Quiz = {
+    ...existingQuiz,
     ...quizToUpdate,
     updated_at: new Date().toISOString(),
   };
-
-  await store.setJSON(updatedQuiz.id.toString(), updatedQuiz);
+  await store.set(String(updatedQuiz.id), JSON.stringify(updatedQuiz));
   return { statusCode: 200, body: JSON.stringify(updatedQuiz) };
 };
 

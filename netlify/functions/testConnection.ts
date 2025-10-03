@@ -1,5 +1,5 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getStore } from '@netlify/blobs';
+import { getStore } from "./netlify-blobs-wrapper.js";
 import { Pool } from '@neondatabase/serverless';
 
 // --- Inlined from _db.ts ---
@@ -77,8 +77,8 @@ const handleSheetsTest = async (event: HandlerEvent) => {
 
 // Netlify Blobs Logic
 const handleBlobsTest = async (event: HandlerEvent) => {
-    const store = getStore('connection-test');
-    await store.list();
+  const store = getStore({ name: 'connection-test' });
+  await store.list();
     return {
         statusCode: 200,
         body: JSON.stringify({ message: 'Netlify Blobs connection successful!' })

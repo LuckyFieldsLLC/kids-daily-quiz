@@ -1,8 +1,8 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getStore } from '@netlify/blobs';
+import { getStore } from "./netlify-blobs-wrapper.js";
 import { randomUUID } from 'crypto';
 import { Pool } from '@neondatabase/serverless';
-import type { NewQuiz, Quiz } from '../../types';
+import type { NewQuiz, Quiz } from '../../types.js';
 
 // --- Inlined from _db.ts ---
 const getDbPool = (event: HandlerEvent): Pool => {
@@ -109,24 +109,29 @@ const handleSheetsCreate = async (event: HandlerEvent) => {
 
 // --- Netlify Blobs Logic ---
 const handleBlobsCreate = async (event: HandlerEvent) => {
-  const quizData = JSON.parse(event.body || '{}') as NewQuiz;
-  const store = getStore({
-    name: 'quizzes',
-    siteID: process.env.BLOBS_SITE_ID, // ✅ 環境変数で指定
-    token: process.env.BLOBS_TOKEN,   // ✅ 環境変数で指定
-  });
+  const quizData = JSON.parse(event.body || '{}') as Partial<Quiz>;
+  const store = getStore({ name: 'quizzes' });
 
+  // 厳密なQuiz型に正規化
   const newQuiz: Quiz = {
-    ...quizData,
-    id: randomUUID(),
+    id: String(randomUUID()),
+    question: String(quizData.question ?? ''),
+    options: Array.isArray(quizData.options)
+      ? quizData.options.map((o: any) =>
+          typeof o === 'object' && o !== null && 'text' in o
+            ? { text: String(o.text) }
+            : { text: String(o) }
+        )
+      : [],
+    answer: String(quizData.answer ?? ''),
     is_active: quizData.is_active ?? true,
-    difficulty: quizData.difficulty ?? 2,
-    fun_level: quizData.fun_level ?? 2,
+    difficulty: typeof quizData.difficulty === 'number' ? quizData.difficulty : 2,
+    fun_level: typeof quizData.fun_level === 'number' ? quizData.fun_level : 2,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 
-  await store.setJSON(newQuiz.id.toString(), newQuiz);
+  await store.set(String(newQuiz.id), JSON.stringify(newQuiz));
   return { statusCode: 201, body: JSON.stringify(newQuiz) };
 };
 

@@ -1,5 +1,5 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getStore } from '@netlify/blobs';
+import { getStore } from "./netlify-blobs-wrapper.js";
 import { Pool } from '@neondatabase/serverless';
 
 // --- Inlined from _db.ts ---
@@ -94,14 +94,8 @@ const handleBlobsDelete = async (event: HandlerEvent) => {
   if (!id) {
     return { statusCode: 400, body: JSON.stringify({ message: 'ID is required' }) };
   }
-
-  const store = getStore({
-    name: 'quizzes',
-    siteID: process.env.BLOBS_SITE_ID, // ✅ 環境変数で指定
-    token: process.env.BLOBS_TOKEN,   // ✅ 環境変数で指定
-  });
-
-  await store.delete(id.toString());
+  const store = getStore({ name: 'quizzes' });
+  await store.delete(String(id));
   return { statusCode: 200, body: JSON.stringify({ message: 'Quiz deleted successfully' }) };
 };
 

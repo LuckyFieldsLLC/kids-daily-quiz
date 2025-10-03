@@ -1,111 +1,48 @@
-import type { Handler, HandlerEvent } from '@netlify/functions';
-import { getStore } from '@netlify/blobs';
+// netlify/functions/getQuizzes.ts
 import { Pool } from '@neondatabase/serverless';
-import type { Quiz, QuizOption } from '../../types';
+import { getStore } from "./netlify-blobs-wrapper.js";
+import type { Handler, HandlerEvent } from '@netlify/functions';
 
-// --- Inlined from _db.ts ---
+// --- DB接続 ---
 const getDbPool = (event: HandlerEvent): Pool => {
   const customDbUrl = event.headers['x-db-url'];
-  if (customDbUrl) {
-    return new Pool({ connectionString: customDbUrl });
+  if (customDbUrl) return new Pool({ connectionString: customDbUrl });
+  if (process.env.NETLIFY_DATABASE_URL) {
+    return new Pool({ connectionString: process.env.NETLIFY_DATABASE_URL });
   }
-  const netlifyDbUrl = process.env.NETLIFY_DATABASE_URL;
-  if (netlifyDbUrl) {
-    return new Pool({ connectionString: netlifyDbUrl });
-  }
-  throw new Error(
-    'Database connection string is not configured. Please set NETLIFY_DATABASE_URL or provide a custom URL.'
-  );
+  throw new Error('Database connection string is not configured.');
 };
 
-// --- Inlined from _sheets-client.ts ---
-const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
-const SHEETS_DEFAULT_RANGE = 'Sheet1!A:I';
-
-interface SheetsAuth {
-  apiKey: string;
-  sheetId: string;
-}
-
-const getSheetsAuth = (event: HandlerEvent): SheetsAuth => {
-  const apiKey = event.headers['x-google-api-key'];
-  const sheetId = event.headers['x-google-sheet-id'];
-  if (!apiKey || !sheetId) throw new Error('Google Sheets API Key and Sheet ID are required.');
-  return { apiKey, sheetId };
-};
-
-const getSheetData = async (auth: SheetsAuth) => {
-  const url = `${SHEETS_API_URL}/${auth.sheetId}/values/${SHEETS_DEFAULT_RANGE}?key=${auth.apiKey}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google Sheets API Error: ${errorText}`);
+// --- Blobs Fetch ---
+const handleBlobsFetch = async (event: HandlerEvent) => {
+  const userId = event.headers['x-user-id'] || 'guest';
+  const store = getStore({ name: 'quizzes' });
+  const { keys } = await store.list();
+  const quizzes: any[] = [];
+  for (const key of keys) {
+    // クイズIDのprefix判定は不要 or 必要ならここで
+    const raw = await store.get(key);
+    if (!raw) continue;
+    const data = JSON.parse(raw);
+    // スコアを合成
+    const scoreKey = `score-${userId}-${key}`;
+    const scoreRaw = await store.get(scoreKey);
+    const score = scoreRaw ? JSON.parse(scoreRaw) : { correct: 0, total: 0 };
+    quizzes.push({ key, ...data, score });
   }
-  const data = await response.json();
-  return (data.values || []) as string[][];
+  quizzes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return { statusCode: 200, body: JSON.stringify(quizzes) };
 };
 
-const rowToQuiz = (row: string[]): Quiz | null => {
-  if (!row || row.length < 4) return null;
-  try {
-    const options: QuizOption[] = JSON.parse(row[2] || '[]');
-    return {
-      id: row[0],
-      question: row[1],
-      options,
-      answer: row[3],
-      created_at: row[4],
-      updated_at: row[5],
-      is_active: row[6] === 'TRUE',
-      difficulty: parseInt(row[7], 10) || 2,
-      fun_level: parseInt(row[8], 10) || 2,
-    };
-  } catch (e) {
-    console.error('Failed to parse row:', row, e);
-    return null;
-  }
-};
-
-// --- DB Logic ---
+// --- Neon DB ---
 const handleDbFetch = async (event: HandlerEvent) => {
   const pool = getDbPool(event);
   const { rows } = await pool.query('SELECT * FROM quizzes ORDER BY created_at DESC');
-  return {
-    statusCode: 200,
-    body: JSON.stringify(rows),
-  };
+  return { statusCode: 200, body: JSON.stringify(rows) };
 };
 
-// --- Sheets Logic ---
-const handleSheetsFetch = async (event: HandlerEvent) => {
-  const auth = getSheetsAuth(event);
-  const rows = await getSheetData(auth);
-  const quizzes = rows.slice(1).map(rowToQuiz).filter(q => q !== null && q.id);
-  quizzes.sort((a, b) => new Date(b!.created_at!).getTime() - new Date(a!.created_at!).getTime());
-  return {
-    statusCode: 200,
-    body: JSON.stringify(quizzes),
-  };
-};
-
-// --- Netlify Blobs Logic ---
-const handleBlobsFetch = async () => {
-  const store = getStore({
-    name: 'quizzes',
-    siteID: process.env.BLOBS_SITE_ID,   // 👈 必要なら Netlify ダッシュボードに設定
-    token: process.env.BLOBS_TOKEN,     // 👈 必要なら Netlify ダッシュボードに設定
-  });
-
-  const { blobs } = await store.list();
-  const quizzes = await Promise.all(
-    blobs.map(blob => store.get(blob.key, { type: 'json' }))
-  );
-  quizzes.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  return {
-    statusCode: 200,
-    body: JSON.stringify(quizzes),
-  };
-};
+// --- Sheets（必要なら残す） ---
+// …省略（今のコードを流用）
 
 // --- Entry Point ---
 export const handler: Handler = async (event) => {
@@ -118,21 +55,24 @@ export const handler: Handler = async (event) => {
   try {
     let result;
     if (storageMode === 'netlify-blobs') {
-      result = await handleBlobsFetch();
+      result = await handleBlobsFetch(event);
     } else if (storageMode === 'google-sheets') {
-      result = await handleSheetsFetch(event);
+      // Sheets fetchを残す場合
+      // result = await handleSheetsFetch(event);
+      throw new Error('Sheets mode not implemented in this version');
     } else {
       result = await handleDbFetch(event);
     }
-    return {
-      ...result,
-      headers: { 'Content-Type': 'application/json' },
-    };
+
+    return { ...result, headers: { 'Content-Type': 'application/json' } };
   } catch (error: any) {
     console.error('Error fetching quizzes:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ message: 'Failed to fetch quizzes.', error: error.message }),
+      body: JSON.stringify({
+        message: 'Failed to fetch quizzes.',
+        error: error.message,
+      }),
     };
   }
 };
