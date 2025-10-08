@@ -13,8 +13,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       handleClose();
-    }, 3500); // 3.5 seconds before starting to fade out
-
+    }, 3500);
     return () => clearTimeout(timer);
   }, []);
   
