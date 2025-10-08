@@ -20,68 +20,7 @@
   }
 }
 </script>
-<style>
-  @keyframes fade-in {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .animate-fade-in {
-    animation: fade-in 0.5s ease-out forwards;
-  }
-  
-  @keyframes toast-in {
-    from {
-      opacity: 0;
-      transform: translateX(100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
-
-  @keyframes toast-out {
-    from {
-      opacity: 1;
-      transform: translateX(0);
-    }
-    to {
-      opacity: 0;
-      transform: translateX(100%);
-    }
-  }
-
-  .animate-toast-in {
-    animation: toast-in 0.3s ease-out forwards;
-  }
-  .animate-toast-out {
-    animation: toast-out 0.3s ease-in forwards;
-  }
-
-  /* Modal scale animations */
-  @keyframes modal-in {
-    0% { opacity: 0; transform: translateY(8px) scale(.96); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
-  }
-  @keyframes modal-out {
-    0% { opacity: 1; transform: translateY(0) scale(1); }
-    100% { opacity: 0; transform: translateY(4px) scale(.96); }
-  }
-  .modal-surface { animation: modal-in .28s cubic-bezier(.16,.84,.44,1) forwards; }
-  .modal-exit { animation: modal-out .2s ease forwards; }
-  /* Utility: To use exit animation, add .modal-exit before unmount and delay unmount ~180ms */
-
-  /* Elevation tokens */
-  :root {
-    --elev-card: 0 2px 4px -1px rgb(0 0 0 / 0.08), 0 4px 12px -2px rgb(0 0 0 / 0.06);
-    --elev-modal: 0 8px 24px -4px rgb(0 0 0 / 0.15), 0 4px 12px -2px rgb(0 0 0 / 0.08);
-  }
-  .elev-card { box-shadow: var(--elev-card); }
-  .elev-modal { box-shadow: var(--elev-modal); }
-
-  .backdrop-blur { backdrop-filter: blur(4px); }
-  .glass-panel { background: rgba(255,255,255,0.92); }
-</style>
+<!-- All keyframes & utility classes moved into index.css (Tailwind build) -->
 <link rel="stylesheet" href="/index.css">
 </head>
   <body class="bg-gray-100">
