@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Button from './Button';
 import Accordion from './Accordion';
 import Modal from './Modal';
@@ -7,7 +7,39 @@ interface HelpModalProps {
   onClose: () => void;
 }
 
+interface QAItem { q: string; a: string; }
+
 const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+  const [question, setQuestion] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<QAItem[]>([]);
+
+  const ask = async () => {
+    if (!question.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/.netlify/functions/askHelp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // 既存のaiService同様にローカル設定からヘッダを付与したいが、ここでは最小: サーバー側がfallbackする
+          // 拡張: 設定コンテキストを利用して provider / apiKey をヘッダに追加する
+        },
+        body: JSON.stringify({ question }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '失敗しました');
+      setHistory(prev => [{ q: question, a: data.answer }, ...prev].slice(0, 10));
+      setQuestion('');
+    } catch (e: any) {
+      setError(e.message || '不明なエラー');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal
       open={true}
@@ -18,6 +50,35 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
       footer={(<div className="flex justify-end"><Button onClick={onClose}>閉じる</Button></div>)}
     >
       <div className="space-y-6">
+          <div className="rounded-lg border border-gray-200 p-4 bg-white/60">
+            <h3 className="font-semibold text-gray-800 mb-2">質問してみる (β)</h3>
+            <div className="flex flex-col md:flex-row gap-2 mb-2">
+              <input
+                type="text"
+                value={question}
+                disabled={loading}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); } }}
+                placeholder="例: AIで作成したクイズを編集するには？"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+                aria-label="ヘルプ質問入力"
+              />
+              <Button onClick={ask} disabled={loading || !question.trim()} loading={loading}>
+                {loading ? '送信中' : '質問する'}
+              </Button>
+            </div>
+            {error && <p className="text-xs text-red-600 mb-2">{error}</p>}
+            {history.length > 0 && (
+              <div className="mt-3 space-y-3 max-h-60 overflow-auto pr-1" aria-live="polite">
+                {history.map((h, idx) => (
+                  <div key={idx} className="text-xs bg-gray-50 border border-gray-200 rounded p-2">
+                    <p className="font-medium text-gray-700">Q: {h.q}</p>
+                    <p className="mt-1 text-gray-700 leading-relaxed">A: {h.a}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <Accordion title="機能一覧" defaultOpen>
             <div className="p-4 space-y-3">
               <section>
