@@ -1,39 +1,23 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React from 'react';
 import Button from './Button';
 import Accordion from './Accordion';
+import Modal from './Modal';
 
 interface HelpModalProps {
   onClose: () => void;
 }
 
 const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
-  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-
-  const handleKey = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-    }
-  }, [onClose]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKey);
-    closeBtnRef.current?.focus();
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [handleKey]);
-
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur z-50 flex justify-center items-start p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
-      <div ref={dialogRef} className="glass-panel elev-modal rounded-lg w-full max-w-3xl my-8 modal-surface" tabIndex={-1}>
-        <div className="p-5 border-b flex justify-between items-center">
-          <h2 id="help-modal-title" className="text-xl font-bold text-gray-800">ヘルプ / このアプリについて</h2>
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="閉じる (Esc)" className="p-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </Button>
-        </div>
-        
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+    <Modal
+      open={true}
+      onOpenChange={(v) => { if (!v) onClose(); }}
+      title="ヘルプ / このアプリについて"
+      description="アプリの機能説明とトラブルシュートガイド"
+      widthClass="max-w-3xl"
+      footer={(<div className="flex justify-end"><Button onClick={onClose}>閉じる</Button></div>)}
+    >
+      <div className="space-y-6">
           <Accordion title="機能一覧" defaultOpen>
             <div className="p-4 space-y-3">
               <section>
@@ -125,13 +109,8 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
               </section>
             </div>
           </Accordion>
-        </div>
-
-        <div className="p-5 border-t flex justify-end">
-          <Button onClick={onClose}>閉じる</Button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 
