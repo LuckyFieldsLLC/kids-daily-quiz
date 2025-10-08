@@ -154,7 +154,7 @@ function extractValidJSON(text: string) {
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, x-ai-provider, x-api-key',
+  'Access-Control-Allow-Headers': 'Content-Type, x-ai-provider, x-api-key',
     'Access-Control-Allow-Methods': 'OPTIONS, POST',
     'Content-Type': 'application/json',
   };

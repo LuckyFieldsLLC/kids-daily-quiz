@@ -174,3 +174,71 @@ node scripts/test-gemini.mjs
 - 🎯 目的：知識・道徳・感情理解を育てる
 - 🧠 機能：AIクイズ生成、オリジナル投稿＋AI添削、毎日配信・記録
 - 🌐 技術：React + TypeScript + Netlify Functions + Gemini API
+
+---
+
+## 🔀 マルチAIプロバイダ対応 (Gemini / OpenAI)
+
+現在、クイズ生成は 2 種類のプロバイダを切り替えて利用できます。
+
+| 項目 | Gemini | OpenAI |
+|------|--------|--------|
+| 既定モデル | gemini-1.5-flash | gpt-4o-mini |
+| 主眼 | 高速/コスト効率 | 高品質/汎用性 |
+| キー設定 | Settings > Gemini APIキー | Settings > OpenAI APIキー |
+
+### 使い方
+1. 右上 設定 を開く
+2. 「AIプロバイダ / APIキー設定」でプロバイダ (Gemini / OpenAI) を選択
+3. 各プロバイダの API キーを入力（必要に応じ両方保存可）
+4. 「Geminiキーをテスト」または「OpenAIキーをテスト」で疎通確認
+5. 「AIで作成」ボタン → 選択中プロバイダで生成
+
+### ヘッダ送信仕様
+Netlify Function `generateQuiz` へ以下ヘッダを付与:
+
+```
+x-ai-provider: gemini | openai
+x-api-key: <ユーザー保存APIキー>
+```
+
+### エラーメッセージ例
+| メッセージ | 対応 |
+|------------|------|
+| Gemini のAPIキーが設定されていません… | Settings で Gemini キー入力 |
+| OpenAI のAPIキーが設定されていません… | Settings で OpenAI キー入力 |
+| クイズ生成に失敗しました | 一時的失敗。再試行 / 切替 / キー有効性確認 |
+
+### 今後の拡張候補
+- OpenAI / Gemini のモデル選択ドロップダウン
+- Claude / DeepSeek など追加プロバイダ
+- 生成結果の差分レビューモード
+
+---
+
+## 🧪 ローカル検証チェックリスト (Quick)
+
+| ステップ | コマンド / 操作 | 期待結果 |
+|----------|------------------|-----------|
+| 依存取得 | `npm install` | エラー無 |
+| Dev起動 | `npx netlify dev` | http://localhost:8888 起動 |
+| 設定保存 | 設定モーダルでAPIキー保存 | トースト成功 & 再読込保持 |
+| Gemini生成 | 「AIで作成」→生成 | QuizForm に転送 |
+| OpenAI生成 | プロバイダ切替→生成 | 同上 |
+| 手動作成 | 「新規作成」→保存 | localStorage `local_quizzes` に追加 |
+| 永続確認 | ブラウザ再起動 | 作成クイズが残る |
+| Function疎通 | DevTools `fetch('/.netlify/functions/testConnection',{method:'POST'})` | 200 応答 |
+
+詳細な検証手順はリポジトリ内ドキュメント会話ログを参照（必要なら別節化可）。
+
+---
+
+## ⚠ 設定ストレージについて
+
+歴史的経緯で `app_settings` / `app_settings_config` 2 種の localStorage キーが存在します。現在 UI 保存は `app_settings` を利用し、AI キー読み出しもこちらへ統一予定です。移行予定:
+
+1. 起動時に旧キーがあれば新キーにマージ
+2. 旧キー削除 (マイグレーションフラグ設定)
+
+---
+

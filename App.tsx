@@ -82,13 +82,15 @@ const Layout: React.FC<{ children: React.ReactNode; settings: AppSettings; setSe
         appTheme={settings.appearance.appTheme}
         onAddNew={() => { setEditingQuiz(null); setShowQuizForm(true); }}
         onGenerateAi={() => {
-          // APIキーガード
-          if (!settings.apiKeys.gemini) {
-            addToast('まず設定でGemini APIキーを入力してください。', 'error');
-            setShowSettings(true);
-            return;
-          }
-          setShowAiGenerator(true);
+          // 選択中プロバイダに応じたキー存在チェック
+          const provider = settings.apiProvider || 'gemini';
+            const key = provider === 'gemini' ? settings.apiKeys.gemini : settings.apiKeys.openai;
+            if (!key) {
+              addToast(`${provider === 'gemini' ? 'Gemini' : 'OpenAI'} のAPIキーを設定してください。`, 'error');
+              setShowSettings(true);
+              return;
+            }
+            setShowAiGenerator(true);
         }}
         onSettings={() => setShowSettings(true)}
         onGoHome={() => navigate('/')}
@@ -144,6 +146,22 @@ const QuizFormModal: React.FC<{ editingQuiz: Quiz | NewQuiz | null; onClose: () 
   useEffect(() => {
     document.addEventListener('keydown', handleKey);
     closeBtnRef.current?.focus();
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusables = Array.from(root.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"))
+        .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', trap);
     return () => document.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
@@ -179,9 +197,23 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' }[]>([]);
 
   useEffect(() => {
+    // --- 設定マイグレーション: app_settings_config -> app_settings ---
+    try {
+      const legacyRaw = localStorage.getItem('app_settings_config');
+      const primaryRaw = localStorage.getItem('app_settings');
+      if (legacyRaw && !primaryRaw) {
+        // 旧フォーマットを新フォーマットへ写し替え
+        const legacy = JSON.parse(legacyRaw);
+        const merged = { ...defaultSettings, ...legacy, appearance: { ...defaultSettings.appearance, ...legacy.appearance }, apiKeys: { ...defaultSettings.apiKeys, ...legacy.apiKeys } };
+        localStorage.setItem('app_settings', JSON.stringify(merged));
+        // フラグ: 一度マイグレーションしたら旧キーを削除（安全のため try/catch）
+        try { localStorage.removeItem('app_settings_config'); } catch { /* ignore */ }
+      }
+    } catch (e) {
+      console.warn('settings migration failed', e);
+    }
     const stored = getSettings();
     if (stored) {
-      // 足りないフィールドがあればデフォルト補完
       setSettings({ ...defaultSettings, ...stored, appearance: { ...defaultSettings.appearance, ...stored.appearance }, apiKeys: { ...defaultSettings.apiKeys, ...stored.apiKeys } });
     }
   }, []);

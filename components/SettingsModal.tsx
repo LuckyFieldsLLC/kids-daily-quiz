@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Button from './Button';
-import type { AppSettings, StorageMode, DbConfig, DisplaySettings } from '../types';
+import type { AppSettings, StorageMode, DbConfig, DisplaySettings, ApiProvider } from '../types';
 import Accordion from './Accordion';
 import * as api from '../services/api';
 
@@ -166,6 +166,28 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, 
     document.addEventListener('keydown', handleKey);
     // 初期フォーカス
     closeButtonRef.current?.focus();
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusables = Array.from(root.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"))
+        .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', trap);
     return () => document.removeEventListener('keydown', handleKey);
   }, [handleKey]);
 
@@ -210,29 +232,82 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, 
                 </div>
             </Accordion>
             
-            <Accordion title="APIキー設定">
-                 <div className="p-4 space-y-4">
-                    <div>
-                        <label htmlFor="gemini" className="block text-sm font-medium text-gray-700">Gemini APIキー</label>
-                        <input
-                            type="password"
-                            id="gemini"
-                            name="gemini"
-                            value={settings.apiKeys.gemini || ''}
-                            onChange={handleApiKeyChange}
-                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
-                        />
-                         <div className="mt-2">
-                            <button
-                                onClick={handleTestGemini}
-                                disabled={isTesting}
-                                className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                            >
-                                {isTesting ? 'テスト中...' : 'キーをテスト'}
-                            </button>
-                        </div>
-                    </div>
-                 </div>
+            <Accordion title="AIプロバイダ / APIキー設定">
+              <div className="p-4 space-y-6">
+                <div>
+                  <label htmlFor="apiProvider" className="block text-sm font-medium text-gray-700">利用するAIプロバイダ</label>
+                  <select
+                    id="apiProvider"
+                    name="apiProvider"
+                    value={settings.apiProvider}
+                    onChange={(e) => setSettings(prev => ({ ...prev, apiProvider: e.target.value as ApiProvider }))}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="gemini">Gemini (Google)</option>
+                    <option value="openai">OpenAI</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">選択されたプロバイダのAPIキーを以下に入力します。</p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="gemini" className="block text-sm font-medium text-gray-700">Gemini APIキー</label>
+                    <input
+                      type="password"
+                      id="gemini"
+                      name="gemini"
+                      value={settings.apiKeys.gemini || ''}
+                      onChange={handleApiKeyChange}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+                      placeholder="AIza..."
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="openai" className="block text-sm font-medium text-gray-700">OpenAI APIキー</label>
+                    <input
+                      type="password"
+                      id="openai"
+                      name="openai"
+                      value={settings.apiKeys.openai || ''}
+                      onChange={handleApiKeyChange}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+                      placeholder="sk-..."
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={handleTestGemini}
+                    disabled={isTesting || !settings.apiKeys.gemini}
+                    className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  >
+                    {isTesting ? 'テスト中...' : 'Geminiキーをテスト'}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!settings.apiKeys.openai) { addToast('OpenAI APIキーを入力してください。', 'error'); return; }
+                      setIsTesting(true);
+                      try {
+                        // OpenAI用簡易接続テスト：generateQuiz Functionに provider=openai で軽量リクエスト (topic=ping)
+                        const res = await fetch('/.netlify/functions/generateQuiz', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-ai-provider': 'openai', 'x-api-key': settings.apiKeys.openai },
+                          body: JSON.stringify({ topic: '接続テスト', difficulty: 1, fun_level: 1 }),
+                        });
+                        if (!res.ok) throw new Error('OpenAI接続に失敗しました');
+                        addToast('OpenAI接続成功', 'success');
+                      } catch (e: any) {
+                        addToast(e.message || 'OpenAI接続テスト失敗', 'error');
+                      } finally {
+                        setIsTesting(false);
+                      }
+                    }}
+                    disabled={isTesting || !settings.apiKeys.openai}
+                    className="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  >
+                    {isTesting ? 'テスト中...' : 'OpenAIキーをテスト'}
+                  </button>
+                </div>
+              </div>
             </Accordion>
             
             <Accordion title="外観設定">

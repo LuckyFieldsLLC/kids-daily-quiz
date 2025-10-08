@@ -69,7 +69,26 @@ const AiQuizGeneratorModal: React.FC<Props> = ({ onClose, onQuizGenerated }) => 
   useEffect(() => {
     document.addEventListener('keydown', handleKey);
     cancelBtnRef.current?.focus();
-    return () => document.removeEventListener('keydown', handleKey);
+    const trap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusables = Array.from(root.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"))
+        .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    document.addEventListener('keydown', trap);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('keydown', trap);
+    };
   }, [handleKey]);
 
   return (
