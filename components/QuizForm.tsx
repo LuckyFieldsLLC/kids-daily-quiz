@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Button from './Button';
 import type { Quiz, NewQuiz } from '../types';
 import LevelSelector from './LevelSelector';
 
@@ -165,20 +166,8 @@ const QuizForm: React.FC<QuizFormProps> = ({ quiz, onSave, onCancel, isSaving })
       </div>
 
       <div className="flex justify-end gap-3 pt-4">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-        >
-          キャンセル
-        </button>
-        <button
-          type="submit"
-          disabled={isSaving}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed"
-        >
-          {isSaving ? '保存中...' : '保存'}
-        </button>
+        <Button variant="outline" type="button" onClick={onCancel}>キャンセル</Button>
+        <Button type="submit" loading={isSaving}>{isSaving ? '保存中...' : '保存'}</Button>
       </div>
     </form>
   );

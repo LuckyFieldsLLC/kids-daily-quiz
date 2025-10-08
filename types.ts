@@ -50,31 +50,33 @@ export interface ApiKeys {
   openai: string;
 }
 
+export type ApiProvider = 'gemini' | 'openai';
+
+// --- ✅ AppSettings：全体設定 ---
 export interface AppSettings {
   storageMode: StorageMode;
   dbConfig: DbConfig;
   apiKeys: ApiKeys;
   display: DisplaySettings;
   appearance: AppearanceSettings;
+  apiProvider: ApiProvider; // ✅ 新規追加
 }
 
 // --- AIクイズ生成用の型定義 ---
-// 入力はすべて number に統一（1〜5段階など）
-// 文字列で持ちたい場合はフォーム側でラベルを付与
 export interface QuizRequest {
-  age: number; // 対象年齢
-  category: string; // カテゴリ（例：道徳・知識など）
-  theme: string; // テーマ（例：感謝・努力など）
-  difficulty: number; // 難易度（1〜5）
-  interestingness: number; // 面白さ（ひらめき度）
-  discussion_value: number; // 対話性（親子の会話を促す度合い）
-  emotional_impact: number; // 感情インパクト（感動・気づきの強さ）
+  age: number;
+  category: string;
+  theme: string;
+  difficulty: number;
+  interestingness: number;
+  discussion_value: number;
+  emotional_impact: number;
 }
 
 export interface QuizResponse {
-  title: string; // クイズタイトル
-  question: string; // 問題文
-  options: string[]; // 選択肢
-  answer: string; // 正解
-  explanation: string; // 解説・親子で話し合うポイント
+  title: string;
+  question: string;
+  options: string[];
+  answer: string;
+  explanation: string;
 }

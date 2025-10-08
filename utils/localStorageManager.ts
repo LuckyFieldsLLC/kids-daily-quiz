@@ -1,7 +1,8 @@
 import type { Quiz, AppSettings, NewQuiz } from '../types';
 
-const QUIZZES_KEY = 'local_quizzes';
-const SETTINGS_KEY = 'app_settings';
+// Export keys so other modules can reference consistently
+export const QUIZZES_KEY = 'local_quizzes';
+export const SETTINGS_KEY = 'app_settings';
 
 // --- App Settings Management ---
 export const saveSettings = (settings: AppSettings): void => {
@@ -26,9 +27,17 @@ export const getSettings = (): AppSettings | null => {
 // --- Local Quiz CRUD ---
 
 export const getQuizzes = async (): Promise<Quiz[]> => {
-    const quizzesJSON = localStorage.getItem(QUIZZES_KEY);
-    const quizzes = quizzesJSON ? JSON.parse(quizzesJSON) : [];
-    return quizzes.sort((a: Quiz, b: Quiz) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
+  const quizzesJSON = localStorage.getItem(QUIZZES_KEY);
+  if (!quizzesJSON) return [];
+  try {
+    const parsed = JSON.parse(quizzesJSON);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.sort((a: Quiz, b: Quiz) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
+  } catch (e) {
+    console.warn('Failed to parse quizzes JSON. Resetting storage.', e);
+    localStorage.removeItem(QUIZZES_KEY);
+    return [];
+  }
 };
 
 const saveAllQuizzes = (quizzes: Quiz[]): void => {
@@ -37,9 +46,15 @@ const saveAllQuizzes = (quizzes: Quiz[]): void => {
 
 export const createQuiz = async (quizData: NewQuiz): Promise<Quiz> => {
     const quizzes = await getQuizzes();
-    const newQuiz: Quiz = {
-        ...quizData,
-        id: new Date().getTime().toString(), // Simple unique ID for local
+  const generateId = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      try { return crypto.randomUUID(); } catch { /* fallback below */ }
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  };
+  const newQuiz: Quiz = {
+    ...quizData,
+    id: generateId(),
         is_active: quizData.is_active ?? true,
         difficulty: quizData.difficulty ?? 2,
         fun_level: quizData.fun_level ?? 2,

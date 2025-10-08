@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
+import Button from './Button';
 import Accordion from './Accordion';
 
 interface HelpModalProps {
@@ -6,14 +7,30 @@ interface HelpModalProps {
 }
 
 const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
+  const handleKey = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  }, [onClose]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKey);
+    closeBtnRef.current?.focus();
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [handleKey]);
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-start p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl my-8 animate-fade-in">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur z-50 flex justify-center items-start p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
+      <div ref={dialogRef} className="glass-panel elev-modal rounded-lg w-full max-w-3xl my-8 modal-surface" tabIndex={-1}>
         <div className="p-5 border-b flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-800">ヘルプ / このアプリについて</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100" aria-label="閉じる">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+          <h2 id="help-modal-title" className="text-xl font-bold text-gray-800">ヘルプ / このアプリについて</h2>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="閉じる (Esc)" className="p-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </Button>
         </div>
         
         <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
@@ -111,13 +128,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
         </div>
 
         <div className="p-5 border-t flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            閉じる
-          </button>
+          <Button onClick={onClose}>閉じる</Button>
         </div>
       </div>
     </div>

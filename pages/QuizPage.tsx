@@ -1,76 +1,36 @@
-import { useState } from 'react';
-import { generateQuiz } from '../services/aiService';
-import type { QuizRequest, QuizResponse } from '../types';
-
 export default function QuizPage() {
-  const [quiz, setQuiz] = useState<QuizResponse | null>(null);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [result, setResult] = useState<string | null>(null);
-
-  async function handleGenerate() {
-    const request: QuizRequest = {
-      age: 10,
-      category: '理科',
-      theme: '動物',
-      difficulty: 'かんたん',
-      interestingness: 'おもしろい',
-      discussion_value: '高い',
-      emotional_impact: '感動的',
-    };
-    const newQuiz = await generateQuiz(request);
-    setQuiz(newQuiz);
-    setSelectedAnswer(null);
-    setResult(null);
-  }
-
-  function handleAnswer(option: string) {
-    if (!quiz) return;
-    setSelectedAnswer(option);
-    if (option === quiz.answer) {
-      setResult('✅ 正解！');
-    } else {
-      setResult(`❌ 不正解（正解: ${quiz.answer}）`);
-    }
-  }
-
   return (
-    <div className="p-4">
-      <h1>AIクイズ</h1>
-      <button onClick={handleGenerate} className="bg-blue-500 text-white px-3 py-1 rounded mb-4">
-        クイズを生成
-      </button>
+    <div className="space-y-8">
+      <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <h1 className="text-2xl font-bold mb-3 tracking-tight">AIクイズ</h1>
+        <p className="text-gray-600 leading-relaxed text-sm md:text-base">
+          上部メニュー「AIで作成」から、年齢やテーマを指定してAIにクイズを生成させることができます。<br />
+          生成後は編集フォームで微調整・保存し、公開設定を切り替えて利用者に届けましょう。
+        </p>
+        <ul className="mt-4 text-sm text-gray-500 list-disc list-inside space-y-1">
+          <li>新規に手動作成したい場合は「新規作成」ボタン</li>
+          <li>各設定（保存先 / APIキー / 外観）は「設定」アイコンから</li>
+          <li>使い方の詳細は「ヘルプ」で確認できます</li>
+        </ul>
+      </section>
 
-      {quiz && (
-        <div className="border p-3 rounded bg-yellow-50">
-          <p className="font-bold">{quiz.question}</p>
-          <ul className="space-y-2 mt-2">
-            {quiz.options.map((opt, i) => (
-              <li key={i}>
-                <button
-                  onClick={() => handleAnswer(opt)}
-                  disabled={!!selectedAnswer}
-                  className={`px-2 py-1 border rounded w-full text-left ${
-                    selectedAnswer === opt
-                      ? opt === quiz.answer
-                        ? 'bg-green-200'
-                        : 'bg-red-200'
-                      : ''
-                  }`}
-                >
-                  {opt}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {result && (
-            <p className="mt-2">
-              {result}
-              <br />
-              {quiz.explanation}
-            </p>
-          )}
+      <section className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-blue-50 to-white p-5 shadow-sm">
+          <h2 className="font-semibold text-gray-800 mb-2">クイズ生成フロー</h2>
+          <ol className="list-decimal list-inside text-sm text-gray-600 space-y-1">
+            <li>ヘッダー「AIで作成」を押す</li>
+            <li>条件（年齢/テーマなど）を入力し生成</li>
+            <li>案を確認し必要なら編集</li>
+            <li>保存して公開設定する</li>
+          </ol>
         </div>
-      )}
+        <div className="rounded-lg border border-gray-200 p-5 shadow-sm bg-white">
+          <h2 className="font-semibold text-gray-800 mb-2">次のステップ</h2>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            近日: 公開クイズ一覧 / 検索 / 履歴リプレイ / スコア集計 ダッシュボードなどを拡張予定です。
+          </p>
+        </div>
+      </section>
     </div>
   );
 }

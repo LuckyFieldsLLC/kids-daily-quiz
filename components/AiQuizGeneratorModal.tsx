@@ -1,5 +1,6 @@
 // src/components/AiQuizGeneratorModal.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Button from './Button';
 import { generateQuiz } from '../services/aiService';
 import type { QuizRequest, QuizResponse } from '../types';
 
@@ -55,10 +56,26 @@ const AiQuizGeneratorModal: React.FC<Props> = ({ onClose, onQuizGenerated }) => 
     }
   };
 
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleKey = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  }, [onClose]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKey);
+    cancelBtnRef.current?.focus();
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [handleKey]);
+
   return (
-    <div className="fixed inset-0 bg-gray-800 bg-opacity-50 flex justify-center items-center">
-      <div className="bg-white p-6 rounded shadow-lg w-96">
-        <h2 className="text-lg font-bold mb-4">🧠 AIクイズ自動生成</h2>
+    <div className="fixed inset-0 bg-black/40 backdrop-blur flex justify-center items-center p-4" role="dialog" aria-modal="true" aria-labelledby="ai-generator-title">
+      <div ref={dialogRef} className="glass-panel elev-modal p-6 rounded-xl w-full max-w-md modal-surface" tabIndex={-1}>
+        <h2 id="ai-generator-title" className="text-lg font-bold mb-4">🧠 AIクイズ自動生成</h2>
 
         <div className="space-y-2">
           <label className="block">
@@ -145,16 +162,9 @@ const AiQuizGeneratorModal: React.FC<Props> = ({ onClose, onQuizGenerated }) => 
         {error && <p className="text-red-500 mt-3">{error}</p>}
 
         <div className="flex justify-end gap-2 mt-6">
-          <button onClick={onClose} className="px-3 py-1 rounded bg-gray-300 hover:bg-gray-400">
-            キャンセル
-          </button>
-          <button
-            onClick={handleGenerate}
-            disabled={loading}
-            className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
-          >
-            {loading ? '生成中...' : '生成'}
-          </button>
+          <button ref={cancelBtnRef} onClick={onClose} className="sr-only" aria-hidden tabIndex={-1}>hidden</button>
+          <Button variant="outline" onClick={onClose}>キャンセル</Button>
+          <Button onClick={handleGenerate} loading={loading}>{loading ? '生成中...' : '生成'}</Button>
         </div>
       </div>
     </div>
