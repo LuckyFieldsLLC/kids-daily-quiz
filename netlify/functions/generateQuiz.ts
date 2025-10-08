@@ -27,7 +27,8 @@ export const handler: Handler = async (event) => {
 
   try {
     // ✅ ヘッダーからAIプロバイダとAPIキーを取得
-    const provider = (event.headers['x-ai-provider'] as AIProvider) || 'gemini';
+  const provider = (event.headers['x-ai-provider'] as AIProvider) || 'gemini';
+  const modelHeader = event.headers['x-ai-model'];
     const apiKey =
       event.headers['x-api-key'] || process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
 
@@ -87,13 +88,14 @@ export const handler: Handler = async (event) => {
     let text = '';
     if (provider === 'gemini') {
       const ai = new GoogleGenerativeAI(apiKey);
-      const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const modelName = typeof modelHeader === 'string' && modelHeader.startsWith('gemini-') ? modelHeader : 'gemini-1.5-flash';
+      const model = ai.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
       text = result.response.text().trim();
     } else if (provider === 'openai') {
       const openai = new OpenAI({ apiKey });
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: typeof modelHeader === 'string' && modelHeader.startsWith('gpt-4o') ? modelHeader : 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
       });
       text = response.choices[0].message?.content?.trim() ?? '';
@@ -127,12 +129,16 @@ export const handler: Handler = async (event) => {
     };
   } catch (error: any) {
     console.error('Error generating quiz:', error);
+    // OpenAI / Gemini レート制限っぽいエラー判定
+    const msg = String(error.message || '');
+    const isRate = /rate limit|429|Resource has been exhausted|quota/i.test(msg);
     return {
-      statusCode: 500,
+      statusCode: isRate ? 429 : 500,
       headers: corsHeaders(),
       body: JSON.stringify({
-        message: 'AIクイズの生成に失敗しました。',
-        error: error.message,
+        message: isRate ? 'レート制限: しばらく待ってから再試行してください。' : 'AIクイズの生成に失敗しました。',
+        error: msg,
+        rateLimited: isRate,
       }),
     };
   }

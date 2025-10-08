@@ -11,6 +11,7 @@ import QuizPage from './pages/QuizPage'; // AI生成＋フォーム
 import SettingsModal from './components/SettingsModal';
 import HelpModal from './components/HelpModal';
 import AiQuizGeneratorModal from './components/AiQuizGeneratorModal';
+import { DelayedUnmount } from './hooks/useDelayedUnmount';
 import QuizForm from './components/QuizForm';
 import Toast from './components/Toast';
 
@@ -24,7 +25,8 @@ const defaultSettings: AppSettings = {
   apiKeys: { gemini: '', openai: '' },
   display: { fontSize: '標準' },
   appearance: { appName: 'Kids Daily Quiz', appIcon: '🧩', appTheme: 'blue' },
-  apiProvider: 'gemini'
+  apiProvider: 'gemini',
+  models: { geminiModel: 'gemini-1.5-flash', openaiModel: 'gpt-4o-mini' }
 };
 
 // 共通レイアウト + モーダル制御を内包させるため、Layoutを stateful にする
@@ -104,28 +106,44 @@ const Layout: React.FC<{ children: React.ReactNode; settings: AppSettings; setSe
       <main className="container mx-auto px-4 py-8 flex-grow">{children}</main>
       <Footer appTheme={settings.appearance.appTheme} appName={settings.appearance.appName} />
 
-      {showSettings && (
-        <SettingsModal
-          currentSettings={settings}
-          onSave={handleSaveSettings}
-          onClose={() => setShowSettings(false)}
-          addToast={addToast}
-        />
-      )}
-      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
-      {showAiGenerator && (
-        <AiQuizGeneratorModal
-          onClose={() => setShowAiGenerator(false)}
-          onQuizGenerated={handleQuizGenerated}
-        />
-      )}
-      {showQuizForm && (
-        <QuizFormModal
-          editingQuiz={editingQuiz}
-          onClose={() => { setShowQuizForm(false); setEditingQuiz(null); }}
-          onSave={handleCreateOrUpdateQuiz}
-        />
-      )}
+      <DelayedUnmount isOpen={showSettings}>{(exiting) => (
+        <div className={exiting ? 'modal-exit' : ''}>
+          {showSettings && (
+            <SettingsModal
+              currentSettings={settings}
+              onSave={handleSaveSettings}
+              onClose={() => setShowSettings(false)}
+              addToast={addToast}
+            />
+          )}
+        </div>
+      )}</DelayedUnmount>
+      <DelayedUnmount isOpen={showHelp}>{(exiting) => (
+        <div className={exiting ? 'modal-exit' : ''}>
+          {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+        </div>
+      )}</DelayedUnmount>
+      <DelayedUnmount isOpen={showAiGenerator}>{(exiting) => (
+        <div className={exiting ? 'modal-exit' : ''}>
+          {showAiGenerator && (
+            <AiQuizGeneratorModal
+              onClose={() => setShowAiGenerator(false)}
+              onQuizGenerated={handleQuizGenerated}
+            />
+          )}
+        </div>
+      )}</DelayedUnmount>
+      <DelayedUnmount isOpen={showQuizForm}>{(exiting) => (
+        <div className={exiting ? 'modal-exit' : ''}>
+          {showQuizForm && (
+            <QuizFormModal
+              editingQuiz={editingQuiz}
+              onClose={() => { setShowQuizForm(false); setEditingQuiz(null); }}
+              onSave={handleCreateOrUpdateQuiz}
+            />
+          )}
+        </div>
+      )}</DelayedUnmount>
     </div>
   );
 };

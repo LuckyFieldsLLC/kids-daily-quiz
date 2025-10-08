@@ -77,12 +77,21 @@ const handleSheetsTest = async (event: HandlerEvent) => {
 
 // Netlify Blobs Logic
 const handleBlobsTest = async (event: HandlerEvent) => {
+  // 環境変数 (Site側) を簡易確認: 実際のNetlify実行環境でのみ意味がある。ローカルCLIでは空の可能性があるため存在しない場合は警告文。
+  const siteId = process.env.BLOBS_SITE_ID;
+  const token = process.env.BLOBS_TOKEN;
   const store = getStore({ name: 'connection-test' });
   await store.list();
-    return {
-        statusCode: 200,
-        body: JSON.stringify({ message: 'Netlify Blobs connection successful!' })
-    };
+  const meta: Record<string, any> = { simulated: !siteId || !token };
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      message: 'Netlify Blobs connection successful!' + (meta.simulated ? ' (ローカルラッパによる擬似接続)' : ''),
+      siteConfigured: !!siteId,
+      tokenConfigured: !!token,
+      meta
+    })
+  };
 };
 
 export default async (event: HandlerEvent) => {

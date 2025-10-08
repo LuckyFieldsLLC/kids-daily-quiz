@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import Modal from './Modal';
 import Button from './Button';
-import type { AppSettings, StorageMode, DbConfig, DisplaySettings, ApiProvider } from '../types';
+import type { AppSettings, StorageMode, DbConfig, DisplaySettings, ApiProvider, ModelSettings } from '../types';
 import Accordion from './Accordion';
 import * as api from '../services/api';
 
@@ -34,7 +35,13 @@ const themeOptions: { value: AppSettings['appearance']['appTheme']; label: strin
 
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, onClose, addToast }) => {
-  const [settings, setSettings] = useState<AppSettings>(currentSettings);
+  const [settings, setSettings] = useState<AppSettings>({
+    ...currentSettings,
+    models: {
+      geminiModel: currentSettings.models?.geminiModel || 'gemini-1.5-flash',
+      openaiModel: currentSettings.models?.openaiModel || 'gpt-4o-mini'
+    }
+  });
   const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
@@ -152,56 +159,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, 
 
   const showConnectionTest = !['local'].includes(settings.storageMode);
 
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-
-  const handleKey = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-    }
-  }, [onClose]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKey);
-    // 初期フォーカス
-    closeButtonRef.current?.focus();
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const root = dialogRef.current;
-      if (!root) return;
-      const focusables = Array.from(root.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"))
-        .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
-      if (focusables.length === 0) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        }
-      } else {
-        if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [handleKey]);
-
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur z-50 flex justify-center items-start p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
-      <div ref={dialogRef} className="glass-panel elev-modal rounded-lg w-full max-w-2xl my-8 modal-surface" tabIndex={-1}>
-        <div className="p-5 border-b flex justify-between items-center">
-          <h2 id="settings-modal-title" className="text-xl font-bold text-gray-800">アプリケーション設定</h2>
-          <button ref={closeButtonRef} onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="閉じる (Esc)">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+    <Modal open onOpenChange={(o) => { if(!o) onClose(); }} title="アプリケーション設定" widthClass="max-w-2xl"
+      footer={
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={onClose}>キャンセル</Button>
+          <Button onClick={handleSave}>保存</Button>
         </div>
-        
-        <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
+      }
+    >
+        <div className="space-y-6">
             <Accordion title="データ保存設定" defaultOpen>
                 <div className="p-4">
                     <label htmlFor="storageMode" className="block text-sm font-medium text-gray-700">データ保存先</label>
@@ -218,6 +185,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, 
                     </select>
                      <p className="text-xs text-gray-500 mt-1">{storageModeOptions.find(o => o.value === settings.storageMode)?.description}</p>
                     {renderStorageConfig()}
+                    {settings.storageMode === 'netlify-blobs' && (
+                      <div className="mt-4 text-xs bg-blue-50 border border-blue-200 rounded p-3 space-y-1 text-blue-800">
+                        <p className="font-semibold">Netlify Blobs 設定手順</p>
+                        <ol className="list-decimal list-inside space-y-0.5">
+                          <li>Netlify ダッシュボード → 対象 Site → Site settings</li>
+                          <li>左メニューから <code className="px-1 bg-white rounded border">Build & Deploy</code> → <code className="px-1 bg-white rounded border">Environment</code> を開く</li>
+                          <li>環境変数 <code className="px-1 bg-white rounded border">BLOBS_SITE_ID</code> と <code className="px-1 bg-white rounded border">BLOBS_TOKEN</code> を追加（添付スクリーンショット参照）</li>
+                          <li>「Save」後、Deploys で <strong>Clear cache and deploy site</strong> を実行</li>
+                          <li>再デプロイ完了後、この画面で「接続テスト」ボタンを押下して成功を確認</li>
+                        </ol>
+                        <p className="mt-1">ローカル開発中は擬似ストア(ファイル)でテストされ <code>.blobs/</code> ディレクトリに保存されます。</p>
+                      </div>
+                    )}
                     {showConnectionTest && (
                         <div className="mt-4">
                             <button
@@ -272,6 +252,32 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, 
                       className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
                       placeholder="sk-..."
                     />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="geminiModel" className="block text-sm font-medium text-gray-700">Gemini モデル</label>
+                    <select
+                      id="geminiModel"
+                      value={settings.models?.geminiModel || 'gemini-1.5-flash'}
+                      onChange={(e) => setSettings(prev => ({ ...prev, models: { ...(prev.models||{}), geminiModel: e.target.value as ModelSettings['geminiModel'], openaiModel: prev.models?.openaiModel || 'gpt-4o-mini' } }))}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="gemini-1.5-flash">gemini-1.5-flash (速い/安価)</option>
+                      <option value="gemini-1.5-pro">gemini-1.5-pro (高精度)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="openaiModel" className="block text-sm font-medium text-gray-700">OpenAI モデル</label>
+                    <select
+                      id="openaiModel"
+                      value={settings.models?.openaiModel || 'gpt-4o-mini'}
+                      onChange={(e) => setSettings(prev => ({ ...prev, models: { ...(prev.models||{}), openaiModel: e.target.value as ModelSettings['openaiModel'], geminiModel: prev.models?.geminiModel || 'gemini-1.5-flash' } }))}
+                      className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="gpt-4o-mini">gpt-4o-mini (コスト効率)</option>
+                      <option value="gpt-4o">gpt-4o (高精度)</option>
+                    </select>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -367,13 +373,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, 
                 </div>
             </Accordion>
         </div>
-
-        <div className="p-5 border-t flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose}>キャンセル</Button>
-          <Button onClick={handleSave}>保存</Button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

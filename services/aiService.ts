@@ -12,6 +12,7 @@ function resolveSettings(): AppSettings | null {
     dbConfig: stored.dbConfig || {},
     display: stored.display,
     appearance: stored.appearance,
+    models: stored.models || { geminiModel: 'gemini-1.5-flash', openaiModel: 'gpt-4o-mini' }
   } as AppSettings;
 }
 
@@ -28,12 +29,15 @@ export async function generateQuiz(params: QuizRequest): Promise<QuizResponse> {
     throw new Error(`${provider === 'gemini' ? 'Gemini' : 'OpenAI'} のAPIキーが設定されていません。設定画面で入力してください。`);
   }
 
+  const settings = resolveSettings();
+  const model = settings?.apiProvider === 'gemini' ? settings?.models?.geminiModel : settings?.models?.openaiModel;
   const response = await fetch('/.netlify/functions/generateQuiz', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-ai-provider': provider,
       'x-api-key': apiKey,
+      ...(model ? { 'x-ai-model': model } : {})
     },
     body: JSON.stringify({
       topic: params.theme,
@@ -44,6 +48,11 @@ export async function generateQuiz(params: QuizRequest): Promise<QuizResponse> {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    if (response.status === 429 || errorData.rateLimited) {
+      const err = new Error(errorData.message || 'レート制限中です。しばらく待って再試行してください。');
+      (err as any).rateLimited = true;
+      throw err;
+    }
     throw new Error(errorData.error || errorData.message || 'クイズ生成に失敗しました');
   }
   return await response.json();

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { generateQuiz } from '../services/aiService';
 import Button from './Button';
 import type { Quiz, NewQuiz } from '../types';
 import LevelSelector from './LevelSelector';
@@ -24,6 +25,8 @@ const funLevels: { [key: number]: string } = { 1: 'ふつう', 2: 'おもしろ�
 
 const QuizForm: React.FC<QuizFormProps> = ({ quiz, onSave, onCancel, isSaving }) => {
   const [formData, setFormData] = useState<Quiz | NewQuiz>(quiz || emptyQuiz);
+  const [originalQuestion, setOriginalQuestion] = useState<string | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
@@ -37,6 +40,7 @@ const QuizForm: React.FC<QuizFormProps> = ({ quiz, onSave, onCancel, isSaving })
         ...initialQuiz,
     };
     setFormData(dataWithDefaults);
+    setOriginalQuestion(dataWithDefaults.question || null);
   }, [quiz]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -81,6 +85,28 @@ const QuizForm: React.FC<QuizFormProps> = ({ quiz, onSave, onCancel, isSaving })
     }
   };
 
+  const handleRegenerate = async () => {
+    try {
+      setRegenerating(true);
+      const ai = await generateQuiz({
+        age: 10,
+        category: '一般',
+        theme: formData.question.slice(0, 12) || '学び',
+        difficulty: formData.difficulty || 2,
+        interestingness: formData.fun_level || 2,
+        discussion_value: 3,
+        emotional_impact: 3
+      });
+      // 既存の問題テキストだけ差し替え候補として保持
+      setOriginalQuestion(formData.question);
+      setFormData(prev => ({ ...prev, question: ai.question }));
+    } catch (e) {
+      // 失敗時は無視（トーストは親コンポーネントで実装予定）
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow-md border border-gray-200">
       <div>
@@ -97,6 +123,19 @@ const QuizForm: React.FC<QuizFormProps> = ({ quiz, onSave, onCancel, isSaving })
           required
         />
         {errors.question && <p className="text-red-500 text-xs mt-1">{errors.question}</p>}
+        <div className="flex items-center gap-3 mt-2">
+          <button type="button" onClick={handleRegenerate} disabled={regenerating} className="text-xs px-2 py-1 rounded border bg-gray-50 hover:bg-gray-100 disabled:opacity-50">
+            {regenerating ? '再生成中...' : 'この問題を別案に差し替え'}
+          </button>
+          {originalQuestion && originalQuestion !== formData.question && (
+            <button type="button" onClick={() => setFormData(prev => ({ ...prev, question: originalQuestion }))} className="text-xs text-blue-600 underline">元に戻す</button>
+          )}
+        </div>
+        {originalQuestion && originalQuestion !== formData.question && (
+          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-gray-700">
+            変更候補プレビュー: <span className="block mt-1 line-clamp-3">{formData.question}</span>
+          </div>
+        )}
       </div>
 
       <div>

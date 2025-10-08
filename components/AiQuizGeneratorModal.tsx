@@ -1,8 +1,9 @@
 // src/components/AiQuizGeneratorModal.tsx
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState } from 'react';
 import Button from './Button';
 import { generateQuiz } from '../services/aiService';
 import type { QuizRequest, QuizResponse } from '../types';
+import Modal from './Modal';
 
 interface Props {
   onClose: () => void;
@@ -56,137 +57,103 @@ const AiQuizGeneratorModal: React.FC<Props> = ({ onClose, onQuizGenerated }) => 
     }
   };
 
-  const dialogRef = useRef<HTMLDivElement | null>(null);
-  const cancelBtnRef = useRef<HTMLButtonElement | null>(null);
-
-  const handleKey = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-    }
-  }, [onClose]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKey);
-    cancelBtnRef.current?.focus();
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const root = dialogRef.current;
-      if (!root) return;
-      const focusables = Array.from(root.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"))
-        .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
-      if (!focusables.length) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => {
-      document.removeEventListener('keydown', handleKey);
-      document.removeEventListener('keydown', trap);
-    };
-  }, [handleKey]);
-
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur flex justify-center items-center p-4" role="dialog" aria-modal="true" aria-labelledby="ai-generator-title">
-      <div ref={dialogRef} className="glass-panel elev-modal p-6 rounded-xl w-full max-w-md modal-surface" tabIndex={-1}>
-        <h2 id="ai-generator-title" className="text-lg font-bold mb-4">🧠 AIクイズ自動生成</h2>
-
-        <div className="space-y-2">
-          <label className="block">
-            対象年齢:
-            <input
-              type="number"
-              value={age}
-              min={3}
-              max={18}
-              onChange={(e) => setAge(Number(e.target.value))}
-              className="border rounded p-1 w-full"
-            />
-          </label>
-
-          <label className="block">
-            カテゴリ:
-            <input
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="border rounded p-1 w-full"
-            />
-          </label>
-
-          <label className="block">
-            テーマ:
-            <input
-              type="text"
-              value={theme}
-              onChange={(e) => setTheme(e.target.value)}
-              className="border rounded p-1 w-full"
-            />
-          </label>
-
-          <label className="block">
-            難易度（1〜5）:
-            <input
-              type="number"
-              value={difficulty}
-              min={1}
-              max={5}
-              onChange={(e) => setDifficulty(Number(e.target.value))}
-              className="border rounded p-1 w-full"
-            />
-          </label>
-
-          <label className="block">
-            面白さ（ひらめき度）:
-            <input
-              type="number"
-              value={interestingness}
-              min={1}
-              max={5}
-              onChange={(e) => setInterestingness(Number(e.target.value))}
-              className="border rounded p-1 w-full"
-            />
-          </label>
-
-          <label className="block">
-            対話性（Discussion Value）:
-            <input
-              type="number"
-              value={discussionValue}
-              min={1}
-              max={5}
-              onChange={(e) => setDiscussionValue(Number(e.target.value))}
-              className="border rounded p-1 w-full"
-            />
-          </label>
-
-          <label className="block">
-            感情インパクト:
-            <input
-              type="number"
-              value={emotionalImpact}
-              min={1}
-              max={5}
-              onChange={(e) => setEmotionalImpact(Number(e.target.value))}
-              className="border rounded p-1 w-full"
-            />
-          </label>
-        </div>
-
-        {error && <p className="text-red-500 mt-3">{error}</p>}
-
-        <div className="flex justify-end gap-2 mt-6">
-          <button ref={cancelBtnRef} onClick={onClose} className="sr-only" aria-hidden tabIndex={-1}>hidden</button>
+    <Modal
+      open={true}
+      onOpenChange={(v) => { if (!v) onClose(); }}
+      title="🧠 AIクイズ自動生成"
+      widthClass="max-w-md"
+      footer={(
+        <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose}>キャンセル</Button>
           <Button onClick={handleGenerate} loading={loading}>{loading ? '生成中...' : '生成'}</Button>
         </div>
+      )}
+    >
+      <div className="space-y-2">
+        <label className="block">
+          対象年齢:
+          <input
+            type="number"
+            value={age}
+            min={3}
+            max={18}
+            onChange={(e) => setAge(Number(e.target.value))}
+            className="border rounded p-1 w-full"
+          />
+        </label>
+
+        <label className="block">
+          カテゴリ:
+          <input
+            type="text"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="border rounded p-1 w-full"
+          />
+        </label>
+
+        <label className="block">
+          テーマ:
+          <input
+            type="text"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value)}
+            className="border rounded p-1 w-full"
+          />
+        </label>
+
+        <label className="block">
+          難易度（1〜5）:
+          <input
+            type="number"
+            value={difficulty}
+            min={1}
+            max={5}
+            onChange={(e) => setDifficulty(Number(e.target.value))}
+            className="border rounded p-1 w-full"
+          />
+        </label>
+
+        <label className="block">
+          面白さ（ひらめき度）:
+          <input
+            type="number"
+            value={interestingness}
+            min={1}
+            max={5}
+            onChange={(e) => setInterestingness(Number(e.target.value))}
+            className="border rounded p-1 w-full"
+          />
+        </label>
+
+        <label className="block">
+          対話性（Discussion Value）:
+          <input
+            type="number"
+            value={discussionValue}
+            min={1}
+            max={5}
+            onChange={(e) => setDiscussionValue(Number(e.target.value))}
+            className="border rounded p-1 w-full"
+          />
+        </label>
+
+        <label className="block">
+          感情インパクト:
+          <input
+            type="number"
+            value={emotionalImpact}
+            min={1}
+            max={5}
+            onChange={(e) => setEmotionalImpact(Number(e.target.value))}
+            className="border rounded p-1 w-full"
+          />
+        </label>
+
+        {error && <p className="text-red-500 mt-3">{error}</p>}
       </div>
-    </div>
+    </Modal>
   );
 };
 
