@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import React from 'react';
 import clsx from 'clsx';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 
 interface ModalProps {
   open: boolean;
@@ -37,7 +38,7 @@ export const Modal: React.FC<ModalProps> = ({ open, onOpenChange, title, descrip
             {!hideCloseButton && (
               <Dialog.Close asChild>
                 <button aria-label="閉じる" className="p-2 rounded hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  <XMarkIcon className="h-5 w-5 text-gray-500" aria-hidden="true" />
                 </button>
               </Dialog.Close>
             )}

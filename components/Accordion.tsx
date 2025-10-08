@@ -1,4 +1,5 @@
 import React, { useState, ReactNode } from 'react';
+import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
 interface AccordionProps {
   title: string;
@@ -21,15 +22,7 @@ const Accordion: React.FC<AccordionProps> = ({ title, children, defaultOpen = fa
         aria-expanded={isOpen}
       >
         <span className="font-semibold text-gray-800">{title}</span>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className={`h-5 w-5 text-gray-500 transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDownIcon className={`h-5 w-5 text-gray-500 transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
       <div
         className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-screen' : 'max-h-0'}`}

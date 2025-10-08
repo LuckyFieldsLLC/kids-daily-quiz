@@ -14,6 +14,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@netlify/blobs": "^10.0.11",
+    "@heroicons/react": "^2.1.5",
     "clsx": "^2.1.1",
     "csv-parse": "^6.1.0",
     "csv-stringify": "^6.6.0",
