@@ -11,7 +11,8 @@ import QuizPage from './pages/QuizPage'; // AI生成＋フォーム
 import SettingsModal from './components/SettingsModal';
 import HelpModal from './components/HelpModal';
 import AiQuizGeneratorModal from './components/AiQuizGeneratorModal';
-import { DelayedUnmount } from './hooks/useDelayedUnmount';
+import Modal from './components/Modal';
+import { DelayedUnmount } from './hooks/useDelayedUnmount'; // TODO: Radix導入済みモーダル分は除去候補
 import QuizForm from './components/QuizForm';
 import Toast from './components/Toast';
 
@@ -106,44 +107,30 @@ const Layout: React.FC<{ children: React.ReactNode; settings: AppSettings; setSe
       <main className="container mx-auto px-4 py-8 flex-grow">{children}</main>
       <Footer appTheme={settings.appearance.appTheme} appName={settings.appearance.appName} />
 
-      <DelayedUnmount isOpen={showSettings}>{(exiting) => (
-        <div className={exiting ? 'modal-exit' : ''}>
-          {showSettings && (
-            <SettingsModal
-              currentSettings={settings}
-              onSave={handleSaveSettings}
-              onClose={() => setShowSettings(false)}
-              addToast={addToast}
-            />
-          )}
-        </div>
-      )}</DelayedUnmount>
-      <DelayedUnmount isOpen={showHelp}>{(exiting) => (
-        <div className={exiting ? 'modal-exit' : ''}>
-          {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
-        </div>
-      )}</DelayedUnmount>
-      <DelayedUnmount isOpen={showAiGenerator}>{(exiting) => (
-        <div className={exiting ? 'modal-exit' : ''}>
-          {showAiGenerator && (
-            <AiQuizGeneratorModal
-              onClose={() => setShowAiGenerator(false)}
-              onQuizGenerated={handleQuizGenerated}
-            />
-          )}
-        </div>
-      )}</DelayedUnmount>
-      <DelayedUnmount isOpen={showQuizForm}>{(exiting) => (
-        <div className={exiting ? 'modal-exit' : ''}>
-          {showQuizForm && (
-            <QuizFormModal
-              editingQuiz={editingQuiz}
-              onClose={() => { setShowQuizForm(false); setEditingQuiz(null); }}
-              onSave={handleCreateOrUpdateQuiz}
-            />
-          )}
-        </div>
-      )}</DelayedUnmount>
+      {showSettings && (
+        <SettingsModal
+          currentSettings={settings}
+          onSave={handleSaveSettings}
+          onClose={() => setShowSettings(false)}
+          addToast={addToast}
+        />
+      )}
+      {showHelp && (
+        <HelpModal onClose={() => setShowHelp(false)} />
+      )}
+      {showAiGenerator && (
+        <AiQuizGeneratorModal
+          onClose={() => setShowAiGenerator(false)}
+          onQuizGenerated={handleQuizGenerated}
+        />
+      )}
+      {showQuizForm && (
+        <QuizFormModal
+          editingQuiz={editingQuiz}
+          onClose={() => { setShowQuizForm(false); setEditingQuiz(null); }}
+          onSave={handleCreateOrUpdateQuiz}
+        />
+      )}
     </div>
   );
 };
@@ -151,62 +138,31 @@ const Layout: React.FC<{ children: React.ReactNode; settings: AppSettings; setSe
 // アクセシビリティ対応済みクイズフォームモーダルを分離
 const QuizFormModal: React.FC<{ editingQuiz: Quiz | NewQuiz | null; onClose: () => void; onSave: (q: NewQuiz | Quiz) => void; }> = ({ editingQuiz, onClose, onSave }) => {
   const [isSaving, setIsSaving] = useState(false);
-  const closeBtnRef = React.useRef<HTMLButtonElement | null>(null);
-  const dialogRef = React.useRef<HTMLDivElement | null>(null);
-
-  const handleKey = React.useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      onClose();
-    }
-  }, [onClose]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKey);
-    closeBtnRef.current?.focus();
-    const trap = (e: KeyboardEvent) => {
-      if (e.key !== 'Tab') return;
-      const root = dialogRef.current;
-      if (!root) return;
-      const focusables = Array.from(root.querySelectorAll<HTMLElement>("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"))
-        .filter(el => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
-      if (!focusables.length) return;
-      const first = focusables[0];
-      const last = focusables[focusables.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    document.addEventListener('keydown', trap);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [handleKey]);
-
   const handleSaveInternal = async (data: NewQuiz | Quiz) => {
     setIsSaving(true);
-    try {
-      await onSave(data);
-    } finally {
-      setIsSaving(false);
-    }
+    try { await onSave(data); } finally { setIsSaving(false); }
   };
-
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur z-50 flex items-start justify-center p-6 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="quiz-form-modal-title">
-      <div ref={dialogRef} className="glass-panel elev-modal rounded-lg w-full max-w-2xl mt-10 p-6 modal-surface" tabIndex={-1}>
-        <div className="flex justify-between items-center mb-4">
-          <h2 id="quiz-form-modal-title" className="text-xl font-bold">{editingQuiz ? 'クイズ編集 / AI案' : '新規クイズ作成'}</h2>
-          <button ref={closeBtnRef} onClick={onClose} className="p-2 rounded hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="閉じる (Esc)">✕</button>
+    <Modal
+      open={true}
+      onOpenChange={(v) => { if (!v) onClose(); }}
+      title={editingQuiz ? 'クイズ編集 / AI案' : '新規クイズ作成'}
+      description="クイズ内容を入力・編集して保存できます"
+      widthClass="max-w-2xl"
+      footer={(
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 rounded border text-sm">キャンセル</button>
+          <button disabled={isSaving} onClick={() => { /* QuizForm 内の保存がトリガー */ }} className="hidden" aria-hidden />
         </div>
-        <QuizForm
-          quiz={editingQuiz}
-          onSave={handleSaveInternal}
-          onCancel={onClose}
-          isSaving={isSaving}
-        />
-      </div>
-    </div>
+      )}
+    >
+      <QuizForm
+        quiz={editingQuiz}
+        onSave={handleSaveInternal}
+        onCancel={onClose}
+        isSaving={isSaving}
+      />
+    </Modal>
   );
 };
 
