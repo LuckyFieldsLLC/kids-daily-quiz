@@ -177,6 +177,200 @@ node scripts/test-gemini.mjs
 
 ---
 
+## 🆕 最近の主な更新 (Digest)
+
+| 日付 | 更新 | 概要 |
+|------|------|------|
+| 2025-10 | Radix Dialog へ全面移行 | 旧カスタムモーダル/遅延アンマウントを撤去し A11y 向上 |
+| 2025-10 | 単一問題の AI 再生成 | 1問だけ差し替えられる軽量再生成フロー |
+| 2025-10 | レート制限 UI | 429 を検出してユーザーにクールダウン明示 |
+| 2025-10 | TTS (Web Speech API) | 問題 + 選択肢を読み上げ可能に |
+| 2025-10 | Q&A (Help) ベータ | アプリ内ヘルプで簡易質問応答 |
+| 2025-10 | Heroicons 導入 | インラインSVGを @heroicons/react に統一 |
+| 2025-10 | Tailwind 本番構成 | CDN 依存排除・PostCSS ビルド |
+
+---
+
+## 🎛 モーダル & アクセシビリティ (Radix 化後)
+
+以前: 手書き Portal / focus trap / 遅延アンマウント。
+
+現在: `@radix-ui/react-dialog` をラップした `Modal` コンポーネント。
+
+特長:
+- フォーカスマネジメント / aria 属性を Radix に委譲
+- `title` / `description` props → 自動で `Dialog.Title` / `Dialog.Description`
+- アニメーション: Tailwind + data-state (`data-[state=open]`) で入退場
+- 閉じるボタンは X (Heroicons) を `Dialog.Close asChild` で包む
+
+追加モーダル手順（最短）:
+```tsx
+<Modal open={open} onOpenChange={setOpen} title="タイトル" description="補足説明">
+   {/* コンテンツ */}
+</Modal>
+```
+
+アクセシビリティ配慮:
+- `aria-modal`, `role=dialog` は Radix が付与
+- 読み上げ順序: タイトル → 説明 → 本文
+- Esc で閉じる / オーバーレイクリックで閉じる (要件に応じて後でロック可)
+
+---
+
+## 🔁 単一問題の再生成 (Regenerate One Question)
+
+目的: 全体再生成コスト/時間を抑え、気になる 1 問だけ差し替える。
+
+ワークフロー:
+1. クイズ一覧で再生成対象の問題を選択
+2. 「1問だけ再生成」ボタン（UI 内）→ Netlify Function を軽量プロンプトで呼び出し
+3. 返却された新しい `question` + `options` をそのスロットに差し替え
+4. 変更を保存（ローカル or Blobs）
+
+考慮点:
+- 履歴保持: 旧問題は内部ヒストリ配列へ（ロールバック容易性）
+- 生成プロンプトは「他の問題との重複を避ける」指示を付与
+- レート制限考慮で指数バックオフ (簡易) 実装可（現状は UI リトライ）
+
+---
+
+## ⏱ レート制限ハンドリング
+
+症状: API 429 / quota exceed。
+
+対策実装:
+- Function から 429 / custom フラグ → フロントで "しばらく待って再試行" メッセージ
+- リトライ制御: 連打抑止でボタン一時 disabled
+- 将来拡張: X秒カウントダウン / バックオフ指数表示 / メトリクス表示
+
+---
+
+## 🔊 読み上げ (TTS)
+
+ライブラリ不要。ブラウザ組込み `speechSynthesis` を使用。
+
+利用方法:
+1. クイズ作成/閲覧画面で「読み上げ」トグルを押す
+2. 質問 + 選択肢を連結 → `SpeechSynthesisUtterance` に渡す
+3. 再押下 or 画面遷移時に停止
+
+実装ポイント (`utils/tts.ts`):
+- `isSupported()` で UA 判定
+- `toggle()` に再生/停止ロジック集約
+- 選択肢は番号付きで読み上げ (例: "1. 〜 2. 〜")
+
+既知制約:
+- 一部モバイル (iOS Safari) はユーザー操作イベント内でのみ許可
+- 多言語音声切替は今後 (設定に voice 選択を追加予定)
+
+---
+
+## ❓ ヘルプ Q&A (ベータ)
+
+エンドポイント: `/.netlify/functions/askHelp`
+
+リクエスト:
+```jsonc
+POST {
+   "question": "TTS が動かない原因は?"
+}
+```
+ヘッダ（任意）: `x-ai-provider`, `x-api-key`, `x-ai-model`
+
+レスポンス:
+```json
+{ "answer": "ブラウザが Web Speech API をサポートしていない可能性があります。" }
+```
+
+制限:
+- 回答は 180 文字程度にトリミング
+- 履歴はクライアント側 max 10 件保持
+
+---
+
+## 🗂 ストレージ & Netlify Blobs
+
+現在既定: `localStorage` (キー: `local_quizzes`, `app_settings` など)。
+
+Blobs 移行方針 (段階的):
+1. Quiz 保存時に JSON を Blob key: `quiz/<id>.json` で PUT
+2. 一覧取得は `list()` → メタデータ + 必要時 lazy fetch
+3. 認証/APIキー分離: Serverless Function 内のみ書き込み許可
+
+運用上の注意:
+- 大量クイズ時は list コスト対策で index キャッシュを別 Blob に維持
+- バージョン管理が必要になれば diff を別キーに保存
+
+---
+
+## 🧪 E2E テスト (Playwright)
+
+インストール済み。基本コマンド:
+```
+npm run test:e2e
+npm run test:e2e:headed
+npm run test:e2e:update
+```
+
+テスト戦略案:
+- 設定保存フロー
+- Gemini 生成 (モック or 実 API スキップ用 flag)
+- 単一再生成ボタンの有効化/挙動
+- TTS トグル (サポートブラウザのみ skip 条件付き)
+- Q&A 入力 → ローディング → 回答表示
+
+---
+
+## 🖼 アイコン方針
+
+`@heroicons/react` (outline) 採用。理由:
+- 一貫したアクセシビリティ (title/aria-hidden 制御容易)
+- SVG インライン管理より差分が明確
+- Tree-shaking で未使用除外可能
+
+追加アイコン: `import { XMarkIcon } from '@heroicons/react/24/outline'`
+
+---
+
+## ⚙️ 環境変数一覧 (現状最小)
+
+| 変数 | 用途 | 備考 |
+|------|------|------|
+| `VITE_GEMINI_API_KEY` | 初期表示用 Gemini キー (任意) | UI 側保存が優先 |
+| `VITE_OPENAI_API_KEY` | 初期表示用 OpenAI キー (任意) | 同上 |
+
+将来 (案):
+- `VITE_DEFAULT_PROVIDER` (gemini/openai)
+- `VITE_STORAGE_MODE` (local/blobs)
+
+---
+
+## 🚀 デプロイ (Netlify)
+
+最小手順:
+1. GitHub リポジトリを Netlify に接続
+2. Build command: `npm run build`
+3. Publish directory: `dist`
+4. Functions directory: `netlify/functions`
+5. 必要な環境変数 (任意) を Netlify UI に設定
+
+ローカル検証: `npx netlify dev` (Functions + Vite プロキシ)
+
+---
+
+## 🗺 今後の拡張 (Roadmap 抜粋)
+
+- モデル選択 UI (Gemini の flash / pro, OpenAI gpt-4.1-mini 等)
+- Claude / DeepSeek 対応
+- クイズカテゴリ & タグフィルタ
+- 分析ダッシュボード (正答率/所要時間)
+- 親子モード (端末2画面同期)
+- 多言語出題 + 自動翻訳
+- TTS 音声選択 / スピード調整
+- アクセス制御 (共有リンク + 期限)
+
+---
+
 ## 🔀 マルチAIプロバイダ対応 (Gemini / OpenAI)
 
 現在、クイズ生成は 2 種類のプロバイダを切り替えて利用できます。
