@@ -3,6 +3,7 @@ import { generateQuiz } from '../services/aiService';
 import Button from './Button';
 import type { Quiz, NewQuiz } from '../types';
 import LevelSelector from './LevelSelector';
+import { toggle as toggleTTS, isSupported as ttsSupported, isSpeaking, buildQuestionNarration, cancel as cancelTTS } from '../utils/tts';
 
 interface QuizFormProps {
   quiz: Quiz | NewQuiz | null;
@@ -28,6 +29,8 @@ const QuizForm: React.FC<QuizFormProps> = ({ quiz, onSave, onCancel, isSaving })
   const [originalQuestion, setOriginalQuestion] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [ttsActive, setTtsActive] = useState(false);
+  const supported = ttsSupported();
 
   useEffect(() => {
     // Ensure options are always an array of objects, and defaults are set
@@ -107,6 +110,22 @@ const QuizForm: React.FC<QuizFormProps> = ({ quiz, onSave, onCancel, isSaving })
     }
   };
 
+  const handleToggleTTS = () => {
+    const narration = buildQuestionNarration(
+      formData.question,
+      (formData.options || []).map(o => o.text).filter(Boolean)
+    );
+    const { started } = toggleTTS(narration, { lang: 'ja-JP', onEnd: () => setTtsActive(false) });
+    setTtsActive(started);
+  };
+
+  useEffect(() => {
+    return () => {
+      // クリーンアップ（フォーム閉じ時に読み上げ停止）
+      cancelTTS();
+    };
+  }, []);
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg shadow-md border border-gray-200">
       <div>
@@ -123,12 +142,25 @@ const QuizForm: React.FC<QuizFormProps> = ({ quiz, onSave, onCancel, isSaving })
           required
         />
         {errors.question && <p className="text-red-500 text-xs mt-1">{errors.question}</p>}
-        <div className="flex items-center gap-3 mt-2">
+        <div className="flex items-center gap-3 mt-2 flex-wrap">
           <button type="button" onClick={handleRegenerate} disabled={regenerating} className="text-xs px-2 py-1 rounded border bg-gray-50 hover:bg-gray-100 disabled:opacity-50">
             {regenerating ? '再生成中...' : 'この問題を別案に差し替え'}
           </button>
           {originalQuestion && originalQuestion !== formData.question && (
             <button type="button" onClick={() => setFormData(prev => ({ ...prev, question: originalQuestion }))} className="text-xs text-blue-600 underline">元に戻す</button>
+          )}
+          {supported && (
+            <button
+              type="button"
+              onClick={handleToggleTTS}
+              aria-pressed={ttsActive}
+              className={`text-xs px-2 py-1 rounded border ${ttsActive ? 'bg-blue-600 text-white' : 'bg-gray-50 hover:bg-gray-100'} transition`}
+            >
+              {ttsActive ? '読み上げ停止' : '読み上げ'}
+            </button>
+          )}
+          {!supported && (
+            <span className="text-[10px] text-gray-400">ブラウザが読み上げ非対応</span>
           )}
         </div>
         {originalQuestion && originalQuestion !== formData.question && (
