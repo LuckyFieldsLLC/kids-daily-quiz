@@ -38,7 +38,14 @@ async function main() {
   const base = process.env.SMOKE_BASE || 'http://localhost:8888';
   const withBase = (p) => `${base.replace(/\/$/, '')}${p}`;
   const quizId = `smoke-${Date.now()}`;
-  const quizPayload = { id: quizId, title: 'Smoke Quiz', questions: [{ q: '1+1?', a: '2' }] };
+  const quizPayload = {
+    question: '1+1は？',
+    options: ['1', '2', '3', '4'],
+    answer: '2',
+    is_active: true,
+    difficulty: 1,
+    fun_level: 2,
+  };
 
   const log = (...args) => console.log('[smoke]', ...args);
 
@@ -50,19 +57,19 @@ async function main() {
 
   // 2) create
   log('create start');
-  const c = await request('POST', withBase('/.netlify/functions/createQuiz'), quizPayload);
+  const c = await request('POST', withBase('/.netlify/functions/createQuiz'), quizPayload, { 'x-storage-mode': 'netlify-blobs' });
   log('create status', c.status, c.text);
   if (c.status !== 200) throw new Error(`create failed: ${c.text}`);
 
   // 3) get
   log('get start');
-  const g = await request('GET', withBase(`/.netlify/functions/getQuizzes?id=${encodeURIComponent(quizId)}`));
+  const g = await request('GET', withBase(`/.netlify/functions/getQuizzes`), undefined, { 'x-storage-mode': 'netlify-blobs' });
   log('get status', g.status, g.text);
   if (g.status !== 200) throw new Error(`get failed: ${g.text}`);
 
   // 4) delete
   log('delete start');
-  const del = await request('POST', withBase('/.netlify/functions/deleteQuiz'), { id: quizId });
+  const del = await request('POST', withBase('/.netlify/functions/deleteQuiz'), { id: quizId }, { 'x-storage-mode': 'netlify-blobs' });
   log('delete status', del.status, del.text);
   if (del.status !== 200) throw new Error(`delete failed: ${del.text}`);
 
