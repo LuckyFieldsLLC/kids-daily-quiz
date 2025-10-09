@@ -91,33 +91,53 @@ const handleBlobsCreate = async (event: HandlerEvent) => {
 };
 
 // --- Entry Point ---
-const handler = async (event: HandlerEvent): Promise<Response> => {
+const handler = async (event: any): Promise<Response> => {
   // Blobs 自動認証コンテキスト接続
   connectBlobsFromEvent(event as any);
 
-  if (event.httpMethod !== 'POST' && event.httpMethod !== 'GET') {
+  const isRequest = typeof event?.method === 'string' && typeof event?.headers?.get === 'function';
+  const method = isRequest ? String(event.method).toUpperCase() : String(event?.httpMethod || '').toUpperCase();
+
+  if (method !== 'POST' && method !== 'GET') {
     return new Response(
-      JSON.stringify({ message: 'Method Not Allowed', got: event.httpMethod, headers: event.headers }),
+      JSON.stringify({ message: 'Method Not Allowed', got: method }),
       { status: 405, headers: { 'Content-Type': 'application/json' } }
     );
   }
 
-  const storageMode = event.headers['x-storage-mode'];
+  const getHeader = (name: string) => {
+    if (isRequest) return event.headers.get(name) || event.headers.get(name.toLowerCase());
+    const h = (event?.headers) || {};
+    return h[name] || h[name?.toLowerCase?.()] || undefined;
+  };
+
+  const storageMode = getHeader('x-storage-mode');
   const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
   const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
-    if (event.httpMethod === 'GET') {
+    if (method === 'GET') {
       return new Response(JSON.stringify({ ok: true, message: 'createQuiz alive' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
-  let result: Response;
+    // Normalize body for both runtimes
+    let normalizedEvent: HandlerEvent = event;
+    if (isRequest) {
+      const text = await event.text();
+      normalizedEvent = {
+        httpMethod: 'POST',
+        headers: Object.fromEntries((event.headers as Headers).entries()),
+        body: text,
+      } as unknown as HandlerEvent;
+    }
+
+    let result: Response;
     if (isBlobs) {
-      result = await handleBlobsCreate(event);
+      result = await handleBlobsCreate(normalizedEvent);
     } else if (isDb) {
-      result = await handleDbCreate(event);
+      result = await handleDbCreate(normalizedEvent);
     } else {
       // fallback local <-> currently local means no server persistent store, reuse blobs fallback
-      result = await handleBlobsCreate(event);
+      result = await handleBlobsCreate(normalizedEvent);
     }
     return result;
   } catch (error: any) {

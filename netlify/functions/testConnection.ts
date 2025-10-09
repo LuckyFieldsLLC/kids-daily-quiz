@@ -46,24 +46,32 @@ const handleBlobsTest = async (event: HandlerEvent) => {
   );
 };
 
-const handler = async (event: HandlerEvent) => {
-  if (event.httpMethod !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+const handler = async (event: any) => {
+  const isRequest = typeof event?.method === 'string' && typeof event?.headers?.get === 'function';
+  const method = isRequest ? String(event.method).toUpperCase() : String(event?.httpMethod || '').toUpperCase();
+  const getHeader = (name: string) => isRequest ? event.headers.get(name) || event.headers.get(name.toLowerCase()) : (event.headers?.[name] || event.headers?.[name?.toLowerCase?.()] || undefined);
+  if (method !== 'POST') {
+    return new Response(JSON.stringify({ message: 'Method Not Allowed', got: method }), { status: 405, headers: { 'Content-Type': 'application/json' } });
   }
 
-  const storageMode = event.headers['x-storage-mode'];
+  const storageMode = getHeader('x-storage-mode');
   const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
   const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
     let result: Response;
     connectBlobsFromEvent(event as any);
+    let normalizedEvent: HandlerEvent = event;
+    if (isRequest) {
+      const text = await event.text();
+      normalizedEvent = { httpMethod: 'POST', headers: Object.fromEntries((event.headers as Headers).entries()), body: text } as unknown as HandlerEvent;
+    }
     if (isBlobs) {
-      result = await handleBlobsTest(event);
+      result = await handleBlobsTest(normalizedEvent);
     } else if (isDb) {
-      result = await handleDbTest(event);
+      result = await handleDbTest(normalizedEvent);
     } else {
-      result = await handleBlobsTest(event); // fallback
+      result = await handleBlobsTest(normalizedEvent); // fallback
     }
     return result;
   } catch (error: any) {
