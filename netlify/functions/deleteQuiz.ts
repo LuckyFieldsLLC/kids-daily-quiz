@@ -48,28 +48,45 @@ const handleBlobsDelete = async (event: HandlerEvent) => {
 };
 
 // --- Entry Point ---
-const handler = async (event: HandlerEvent): Promise<Response> => {
+const handler = async (event: any): Promise<Response> => {
   connectBlobsFromEvent(event as any);
-  if (event.httpMethod !== 'POST' && event.httpMethod !== 'DELETE') {
+
+  const isRequest = typeof event?.method === 'string' && typeof event?.headers?.get === 'function';
+  const method = isRequest ? String(event.method).toUpperCase() : String(event?.httpMethod || '').toUpperCase();
+  if (method !== 'POST' && method !== 'DELETE') {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const storageMode = event.headers['x-storage-mode'];
+  const getHeader = (name: string) => isRequest
+    ? (event.headers.get(name) || event.headers.get(name.toLowerCase()))
+    : (event.headers?.[name] || event.headers?.[name?.toLowerCase?.()]);
+  const storageMode = getHeader('x-storage-mode');
   const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
   const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
+
+  // 正規化
+  let normalizedEvent: HandlerEvent = event as any;
+  if (isRequest) {
+    const text = await event.text();
+    normalizedEvent = {
+      httpMethod: method,
+      headers: Object.fromEntries((event.headers as Headers).entries()),
+      body: text,
+    } as unknown as HandlerEvent;
+  }
 
   try {
     let result: Response;
     if (isBlobs) {
-      result = await handleBlobsDelete(event);
+      result = await handleBlobsDelete(normalizedEvent);
     } else if (isDb) {
-      result = await handleDbDelete(event);
+      result = await handleDbDelete(normalizedEvent);
     } else {
-      result = await handleBlobsDelete(event); // fallback
+      result = await handleBlobsDelete(normalizedEvent); // fallback
     }
     return result;
   } catch (error: any) {
-    console.error("Error deleting quiz:", error);
+    console.error('Error deleting quiz:', error);
     return new Response(
       JSON.stringify({ message: 'Failed to delete quiz.', error: error.message }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
