@@ -44,7 +44,9 @@ const Header: React.FC<HeaderProps> = ({ appName, appIcon, appTheme, onAddNew, o
                      <Button variant="secondary" size="md" onClick={onAddNew}>新規作成</Button>
                    </Tooltip>
                   <Tooltip text="トピックを指定してAIにクイズを自動生成させます。">
-                    <Button variant="primary" size="md" onClick={onGenerateAi} leftIcon={<span>🤖</span>}>AIで作成</Button>
+                    <Button variant="primary" size="md" onClick={onGenerateAi} leftIcon={<span>🤖</span>} data-action-open-ai-generator>
+                      AIで作成
+                    </Button>
                   </Tooltip>
              <Tooltip text="データ保存先やAPIキーなどの設定を変更します。">
                <Button variant="ghost" size="md" onClick={onSettings} aria-label="設定" leftIcon={<Cog6ToothIcon className="h-5 w-5" aria-hidden="true" />}>設定</Button>

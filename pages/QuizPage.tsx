@@ -1,17 +1,24 @@
+import { Link } from 'react-router-dom';
+
 export default function QuizPage() {
   return (
     <div className="space-y-8">
-      <section className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <h1 className="text-2xl font-bold mb-3 tracking-tight">AIクイズ</h1>
-        <p className="text-gray-600 leading-relaxed text-sm md:text-base">
-          上部メニュー「AIで作成」から、年齢やテーマを指定してAIにクイズを生成させることができます。<br />
-          生成後は編集フォームで微調整・保存し、公開設定を切り替えて利用者に届けましょう。
+      {/* 中央CTA */}
+      <section className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm text-center">
+        <h1 className="text-2xl md:text-3xl font-bold mb-3 tracking-tight">AIクイズを作成しよう</h1>
+        <p className="text-gray-600 leading-relaxed text-sm md:text-base mb-6">
+          年齢やテーマを指定して、AIにクイズを自動生成してもらえます。生成後は編集して保存、公開設定で配信できます。
         </p>
-        <ul className="mt-4 text-sm text-gray-500 list-disc list-inside space-y-1">
-          <li>新規に手動作成したい場合は「新規作成」ボタン</li>
-          <li>各設定（保存先 / APIキー / 外観）は「設定」アイコンから</li>
-          <li>使い方の詳細は「ヘルプ」で確認できます</li>
-        </ul>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <a href="#" onClick={(e)=>{e.preventDefault(); const btn=document.querySelector('[data-action-open-ai-generator]') as HTMLButtonElement|null; btn?.click();}} className="inline-flex items-center justify-center px-6 py-3 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-base font-medium shadow">
+            AIでクイズ作成
+          </a>
+          <div className="flex gap-2 text-sm text-blue-700">
+            <Link to="/history" className="underline">履歴を見る</Link>
+            <span>・</span>
+            <Link to="/import" className="underline">CSVをインポート</Link>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-6 md:grid-cols-2">
@@ -25,10 +32,12 @@ export default function QuizPage() {
           </ol>
         </div>
         <div className="rounded-lg border border-gray-200 p-5 shadow-sm bg-white">
-          <h2 className="font-semibold text-gray-800 mb-2">次のステップ</h2>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            近日: 公開クイズ一覧 / 検索 / 履歴リプレイ / スコア集計 ダッシュボードなどを拡張予定です。
-          </p>
+          <details>
+            <summary className="font-semibold text-gray-800 cursor-pointer">次のステップ</summary>
+            <div className="mt-2 text-sm text-gray-600 leading-relaxed">
+              公開クイズ一覧 / 検索 / 履歴リプレイ / スコア集計 ダッシュボードなどを拡張予定です。
+            </div>
+          </details>
         </div>
       </section>
     </div>

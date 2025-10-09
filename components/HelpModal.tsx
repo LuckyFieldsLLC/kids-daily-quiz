@@ -50,6 +50,30 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
       footer={(<div className="flex justify-end"><Button onClick={onClose}>閉じる</Button></div>)}
     >
       <div className="space-y-6">
+          <Accordion title="開発マイルストーン / 更新履歴" defaultOpen>
+            <div className="p-4 space-y-3 text-sm text-gray-700">
+              <p>
+                現在のベース完成版: <strong>v1.0.0 (2025-10-09)</strong>
+                {" "}
+                <a className="text-blue-600 underline" href="./CHANGELOG.md" target="_blank" rel="noreferrer">CHANGELOG</a>
+                {" / "}
+                <a className="text-blue-600 underline" href="./docs/MILESTONE-2025-10-BASE.md" target="_blank" rel="noreferrer">Milestone</a>
+              </p>
+              <details className="rounded border p-3 bg-white/60">
+                <summary className="cursor-pointer font-medium">リリース履歴（ダイジェスト）</summary>
+                <ul className="list-disc list-inside mt-2 text-gray-700">
+                  <li>
+                    <strong>v1.0.0 Base Stable（2025.10.09）</strong>
+                    <ul className="list-disc list-inside ml-5 text-gray-600">
+                      <li>Blobs と API 連携の安定化（診断/作成/一覧/削除 ALL GREEN）</li>
+                      <li>AI クイズ生成（Gemini / GPT 両対応）</li>
+                    </ul>
+                  </li>
+                </ul>
+              </details>
+              <p className="text-xs text-gray-500">将来的に <code>docs/releases.json</code> から自動生成予定</p>
+            </div>
+          </Accordion>
           <div className="rounded-lg border border-gray-200 p-4 bg-white/60">
             <h3 className="font-semibold text-gray-800 mb-2">質問してみる (β)</h3>
             <div className="flex flex-col md:flex-row gap-2 mb-2">

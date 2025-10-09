@@ -8,6 +8,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import HistoryPage from './pages/HistoryPage'; // 履歴・再挑戦
 import ImportPage from './pages/ImportPage'; // CSVインポート
 import QuizPage from './pages/QuizPage'; // AI生成＋フォーム
+import ManagePage from './pages/ManagePage'; // クイズ管理
 import SettingsModal from './components/SettingsModal';
 import HelpModal from './components/HelpModal';
 import AiQuizGeneratorModal from './components/AiQuizGeneratorModal';
@@ -103,6 +104,7 @@ const Layout: React.FC<{ children: React.ReactNode; settings: AppSettings; setSe
         <Link to="/" className="hover:underline">AIクイズ</Link>
         <Link to="/import" className="hover:underline">CSVインポート</Link>
         <Link to="/history" className="hover:underline">履歴</Link>
+        <Link to="/manage" className="hover:underline">管理</Link>
       </nav>
       <main className="container mx-auto px-4 py-8 flex-grow">{children}</main>
       <Footer appTheme={settings.appearance.appTheme} appName={settings.appearance.appName} />
@@ -220,6 +222,7 @@ const App: React.FC = () => {
             <Route path="/" element={<QuizPage />} />
             <Route path="/import" element={<ImportPage />} />
             <Route path="/history" element={<HistoryPage />} />
+            <Route path="/manage" element={<ManagePage />} />
           </Routes>
         </Layout>
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 space-y-2 z-50 w-full max-w-md px-4">
