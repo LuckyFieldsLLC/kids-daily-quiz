@@ -28,7 +28,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@heroicons/react": "^2.1.5",
-    "@luckyfields/blobs-utils": "github:LuckyFieldsLLC/LuckyFields-Platform#main",
+  "@luckyfields/blobs-utils": "file:LuckyFields-Platform/packages/blobs-utils",
     "@netlify/blobs": "^10.0.11",
     "clsx": "^2.1.1",
     "csv-parse": "^6.1.0",

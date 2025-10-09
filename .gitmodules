@@ -1,0 +1,3 @@
+[submodule "LuckyFields-Platform"]
+	path = LuckyFields-Platform
+	url = https://github.com/LuckyFieldsLLC/LuckyFields-Platform.git
