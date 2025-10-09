@@ -163,6 +163,7 @@ node scripts/test-gemini.mjs
 - [VISION（開発ビジョン・教育理念）](./docs/VISION.md)
 - [ARCHITECTURE（技術構成）](./docs/ARCHITECTURE.md)
 - [ROADMAP（開発計画）](./docs/ROADMAP.md)
+- [Netlify Blobs 実践ガイド](./docs/NETLIFY_BLOBS_GUIDE.md)
 
 ---
 
