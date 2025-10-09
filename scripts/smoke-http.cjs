@@ -37,7 +37,6 @@ function request(method, url, body, headers = {}) {
 async function main() {
   const base = process.env.SMOKE_BASE || 'http://localhost:8888';
   const withBase = (p) => `${base.replace(/\/$/, '')}${p}`;
-  const quizId = `smoke-${Date.now()}`;
   const quizPayload = {
     question: '1+1は？',
     options: ['1', '2', '3', '4'],
@@ -59,17 +58,27 @@ async function main() {
   log('create start');
   const c = await request('POST', withBase('/.netlify/functions/createQuiz'), quizPayload, { 'x-storage-mode': 'netlify-blobs' });
   log('create status', c.status, c.text);
-  if (c.status !== 200) throw new Error(`create failed: ${c.text}`);
+  if (c.status !== 200 && c.status !== 201) throw new Error(`create failed: ${c.text}`);
+  let createdId = undefined;
+  try { createdId = JSON.parse(c.text).id; } catch {}
+  if (!createdId) throw new Error('create failed: missing id in response');
 
   // 3) get
   log('get start');
   const g = await request('GET', withBase(`/.netlify/functions/getQuizzes`), undefined, { 'x-storage-mode': 'netlify-blobs' });
   log('get status', g.status, g.text);
   if (g.status !== 200) throw new Error(`get failed: ${g.text}`);
+  try {
+    const arr = JSON.parse(g.text);
+    const exists = Array.isArray(arr) && arr.some(x => x.id === createdId);
+    if (!exists) throw new Error('created id not found in list');
+  } catch (e) {
+    throw new Error(`get verification failed: ${e?.message || e}`);
+  }
 
   // 4) delete
   log('delete start');
-  const del = await request('POST', withBase('/.netlify/functions/deleteQuiz'), { id: quizId }, { 'x-storage-mode': 'netlify-blobs' });
+  const del = await request('POST', withBase('/.netlify/functions/deleteQuiz'), { id: createdId }, { 'x-storage-mode': 'netlify-blobs' });
   log('delete status', del.status, del.text);
   if (del.status !== 200) throw new Error(`delete failed: ${del.text}`);
 

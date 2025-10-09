@@ -49,24 +49,37 @@ const handleDbFetch = async (event: HandlerEvent): Promise<Response> => {
 // Google Sheets support removed (deprecated)
 
 // --- Entry Point ---
-export const handler = async (event: HandlerEvent): Promise<Response> => {
-  if (event.httpMethod !== 'GET') {
+const handler = async (event: any): Promise<Response> => {
+  const isRequest = typeof event?.method === 'string' && typeof event?.headers?.get === 'function';
+  const method = isRequest ? String(event.method).toUpperCase() : String(event?.httpMethod || '').toUpperCase();
+  if (method !== 'GET') {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
   connectBlobsFromEvent(event as any);
-    const storageMode = event.headers['x-storage-mode'];
-    const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
-    const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
+
+  const getHeader = (name: string) => isRequest ? (event.headers.get(name) || event.headers.get(name.toLowerCase())) : (event.headers?.[name] || event.headers?.[name?.toLowerCase?.()]);
+  const storageMode = getHeader('x-storage-mode');
+  const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
+  const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
+
+  let normalizedEvent: HandlerEvent = event as any;
+  if (isRequest) {
+    normalizedEvent = {
+      httpMethod: 'GET',
+      headers: Object.fromEntries((event.headers as Headers).entries()),
+      body: undefined,
+    } as unknown as HandlerEvent;
+  }
 
   try {
     let result: Response;
     if (isBlobs) {
-      result = await handleBlobsFetch(event);
+      result = await handleBlobsFetch(normalizedEvent);
     } else if (isDb) {
-      result = await handleDbFetch(event);
+      result = await handleDbFetch(normalizedEvent);
     } else {
-      result = await handleBlobsFetch(event); // fallback
+      result = await handleBlobsFetch(normalizedEvent); // fallback
     }
 
     return result;
@@ -78,3 +91,5 @@ export const handler = async (event: HandlerEvent): Promise<Response> => {
     );
   }
 };
+
+export default handler;
