@@ -1,8 +1,9 @@
 import type { Quiz } from '../../types.js';
 import { Handler } from '@netlify/functions';
-import { getQuizStore } from './quizStore.js';
+import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
 
 export const handler: Handler = async (event) => {
+  connectBlobsFromEvent(event as any);
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }

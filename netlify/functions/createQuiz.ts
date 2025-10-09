@@ -1,5 +1,5 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getQuizStore } from './quizStore.js';
+import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
 import { randomUUID } from 'crypto';
 import { Pool } from '@neondatabase/serverless';
 import type { NewQuiz, Quiz } from '../../types.js';
@@ -83,6 +83,9 @@ const handleBlobsCreate = async (event: HandlerEvent) => {
 
 // --- Entry Point ---
 const handler = async (event: HandlerEvent) => {
+  // Blobs 自動認証コンテキスト接続
+  connectBlobsFromEvent(event as any);
+
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }

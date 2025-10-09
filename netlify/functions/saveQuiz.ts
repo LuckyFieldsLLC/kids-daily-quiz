@@ -1,5 +1,6 @@
 import type { Quiz } from '../../types.js';
 import { getQuizStore } from './quizStore.js';
+import { connectBlobsFromEvent } from './quizStore.js';
 import type { Handler } from '@netlify/functions';
 
 export const handler: Handler = async (event) => {
@@ -7,6 +8,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
+  connectBlobsFromEvent(event as any);
   try {
     const quiz = JSON.parse(event.body || '{}') as Quiz;
     if (!quiz.id) return { statusCode: 400, body: 'Quiz must have id' };

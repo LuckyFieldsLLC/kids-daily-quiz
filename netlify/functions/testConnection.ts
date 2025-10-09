@@ -1,5 +1,5 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getGenericStore } from './quizStore.js';
+import { getGenericStore, connectBlobsFromEvent } from './quizStore.js';
 import { Pool } from '@neondatabase/serverless';
 
 // --- Inlined from _db.ts ---
@@ -57,6 +57,7 @@ const handler = async (event: HandlerEvent) => {
 
   try {
     let result: Response;
+    connectBlobsFromEvent(event as any);
     if (isBlobs) {
       result = await handleBlobsTest(event);
     } else if (isDb) {

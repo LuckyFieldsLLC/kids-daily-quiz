@@ -1,5 +1,5 @@
 import type { Handler } from '@netlify/functions';
-import { getGenericStore } from './quizStore.js';
+import { getGenericStore, connectBlobsFromEvent } from './quizStore.js';
 
 interface StepResult {
   step: string;
@@ -9,6 +9,8 @@ interface StepResult {
 }
 
 export const handler: Handler = async (event) => {
+  // Blobs 自動認証コンテキストの接続（Lambda互換）
+  connectBlobsFromEvent(event);
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }

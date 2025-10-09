@@ -1,5 +1,5 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getQuizStore } from './quizStore.js';
+import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
 import { Pool } from '@neondatabase/serverless';
 
 // --- Inlined from _db.ts ---
@@ -49,7 +49,8 @@ const handleBlobsDelete = async (event: HandlerEvent) => {
 
 // --- Entry Point ---
 const handler = async (event: HandlerEvent) => {
-  if (event.httpMethod !== 'DELETE') {
+  connectBlobsFromEvent(event as any);
+  if (event.httpMethod !== 'POST' && event.httpMethod !== 'DELETE') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 

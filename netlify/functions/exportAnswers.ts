@@ -1,7 +1,8 @@
-import { getQuizStore } from './quizStore.js';
+import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
 import type { Handler } from '@netlify/functions';
 
-export const handler: Handler = async () => {
+export const handler: Handler = async (event) => {
+  connectBlobsFromEvent(event as any);
   try {
   const store = await getQuizStore();
     const { keys } = await store.list();

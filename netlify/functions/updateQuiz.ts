@@ -1,6 +1,6 @@
 import type { NewQuiz, Quiz } from '../../types.js';
 import type { HandlerEvent } from '@netlify/functions';
-import { getQuizStore } from './quizStore.js';
+import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
 import { Pool } from '@neondatabase/serverless';
 
 // --- Inlined from _db.ts ---
@@ -66,6 +66,7 @@ const handleBlobsUpdate = async (event: HandlerEvent) => {
 
 // --- Entry Point ---
 const handler = async (event: HandlerEvent) => {
+  connectBlobsFromEvent(event as any);
   if (event.httpMethod !== 'PUT') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }

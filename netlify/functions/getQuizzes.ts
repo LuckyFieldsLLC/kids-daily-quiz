@@ -1,6 +1,6 @@
 // netlify/functions/getQuizzes.ts
 import { Pool } from '@neondatabase/serverless';
-import { getGenericStore } from './quizStore.js';
+import { getGenericStore, connectBlobsFromEvent } from './quizStore.js';
 import type { Handler, HandlerEvent } from '@netlify/functions';
 
 // --- DB接続 ---
@@ -54,6 +54,7 @@ export const handler: Handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
+  connectBlobsFromEvent(event as any);
     const storageMode = event.headers['x-storage-mode'];
     const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
     const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';

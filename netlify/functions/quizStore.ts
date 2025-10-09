@@ -15,6 +15,18 @@ function resolveNetlifyGetStore(): ((opts: { name: string }) => any) {
   return candidate as (opts: { name: string }) => any;
 }
 
+// Netlify Lambda 環境で event から Blobs の実行コンテキストを接続する
+export function connectBlobsFromEvent(event: any) {
+  try {
+    const fn = (netlifyBlobs as any).connectLambda;
+    if (typeof fn === 'function' && event && (event as any).blobs) {
+      fn(event);
+    }
+  } catch {
+    // 無害にスキップ
+  }
+}
+
 function isNetlifyProdLike() {
   // Netlify ビルド/関数実行でセットされうる環境指標を広く考慮
   const isNetlifyFlag = process.env.NETLIFY === 'true';
