@@ -53,9 +53,6 @@ const handler = async (event: any): Promise<Response> => {
 
   const isRequest = typeof event?.method === 'string' && typeof event?.headers?.get === 'function';
   const method = isRequest ? String(event.method).toUpperCase() : String(event?.httpMethod || '').toUpperCase();
-  if (method !== 'POST' && method !== 'DELETE') {
-    return new Response('Method Not Allowed', { status: 405 });
-  }
 
   const getHeader = (name: string) => isRequest
     ? (event.headers.get(name) || event.headers.get(name.toLowerCase()))
@@ -69,7 +66,7 @@ const handler = async (event: any): Promise<Response> => {
   if (isRequest) {
     const text = await event.text();
     normalizedEvent = {
-      httpMethod: method,
+      httpMethod: method || 'POST',
       headers: Object.fromEntries((event.headers as Headers).entries()),
       body: text,
     } as unknown as HandlerEvent;
