@@ -4,7 +4,10 @@ import fs from "fs/promises";
 import path from "path";
 
 export function getStore({ name }: { name: string }) {
-  const baseDir = path.resolve(".blobs", name);
+  // 本番等の読み取り専用ファイルシステムで失敗しないよう、/tmp 配下を優先
+  const baseDir = (process.env.NETLIFY === 'true' && process.env.NETLIFY_DEV !== 'true')
+    ? path.posix.join('/tmp', '.blobs', name)
+    : path.resolve(".blobs", name);
 
   async function ensureDir() {
     await fs.mkdir(baseDir, { recursive: true });

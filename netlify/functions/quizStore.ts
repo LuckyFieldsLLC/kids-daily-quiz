@@ -1,45 +1,44 @@
 // quizStore.ts
 // 環境に応じて Netlify Blobs (本番) かローカル簡易ラッパを返すファクトリ
-// 本番: BLOBS_SITE_ID / BLOBS_TOKEN が存在し、@netlify/blobs が利用可能
-// ローカル(dev) or 無効: 既存の netlify-blobs-wrapper を使用
+// 本番: 自動認証で @netlify/blobs を利用
+// ローカル(dev) or テスト: 既存の netlify-blobs-wrapper を使用
 
-let realGetStore: any | null = null;
-let triedImport = false;
+import * as netlifyBlobs from '@netlify/blobs';
 
-async function loadRealGetStore() {
-  if (realGetStore || triedImport) return realGetStore;
-  triedImport = true;
-  try {
-    const mod: any = await import('@netlify/blobs');
-    const candidate = mod.getStore || mod.default?.getStore || mod.default;
-    if (typeof candidate === 'function') {
-      realGetStore = candidate;
-    } else {
-      console.warn('[quizStore] @netlify/blobs loaded but getStore function not found.');
-    }
-  } catch (e) {
-    // 本番で失敗した場合はログのみ。ローカルでは想定どおり fallback
-    console.warn('[quizStore] Falling back to local wrapper getStore:', (e as Error).message);
+function resolveNetlifyGetStore(): ((opts: { name: string }) => any) {
+  const candidate: any = (netlifyBlobs as any).getStore
+    || (netlifyBlobs as any).default?.getStore
+    || (netlifyBlobs as any).default;
+  if (typeof candidate !== 'function') {
+    throw new Error('@netlify/blobs does not export getStore');
   }
-  return realGetStore;
+  return candidate as (opts: { name: string }) => any;
+}
+
+function isNetlifyProdLike() {
+  // Netlify Functions 上では NETLIFY=true がセットされ、ローカルの netlify dev では NETLIFY_DEV=true がつく
+  // 本番/デプロイプレビュー/ブランチデプロイのような実行環境ではフォールバックを禁止する
+  return process.env.NETLIFY === 'true' && process.env.NETLIFY_DEV !== 'true';
 }
 
 export async function getQuizStore() {
-  if (process.env.FORCE_LOCAL_BLOBS === '1') {
+  if (process.env.FORCE_LOCAL_BLOBS === '1' && !isNetlifyProdLike()) {
     const { getStore } = await import('./netlify-blobs-wrapper.js');
     return normalizeStore(getStore({ name: 'quizzes' }), 'local');
   }
-  const g = await loadRealGetStore();
-  if (g) {
-    try {
-      // 自動認証（Netlify Functions 実行時）を優先。未構成ならここで例外→ローカルへフォールバック。
-      return normalizeStore(g({ name: 'quizzes' }), 'real');
-    } catch (e: any) {
-      console.warn('[quizStore] Real getStore not available, falling back:', e?.message || e);
+  try {
+    // 自動認証（Netlify Functions 実行時）を優先。未構成なら例外
+    const g = resolveNetlifyGetStore();
+    return normalizeStore(g({ name: 'quizzes' }), 'real');
+  } catch (e: any) {
+    if (isNetlifyProdLike()) {
+      // 本番系ではローカルフォールバックを禁止
+      throw new Error(`[quizStore] Netlify Blobs is unavailable in this environment: ${e?.message || e}`);
     }
+    console.warn('[quizStore] Using local wrapper (dev/test fallback):', e?.message || e);
+    const { getStore } = await import('./netlify-blobs-wrapper.js');
+    return normalizeStore(getStore({ name: 'quizzes' }), 'local');
   }
-  const { getStore } = await import('./netlify-blobs-wrapper.js');
-  return normalizeStore(getStore({ name: 'quizzes' }), 'local');
 }
 
 // list() 返却 shape の差異を吸収するラッパ
@@ -66,18 +65,19 @@ function normalizeStore(store: any, kind?: 'real' | 'local') {
 }
 
 export async function getGenericStore(name: string) {
-  if (process.env.FORCE_LOCAL_BLOBS === '1') {
+  if (process.env.FORCE_LOCAL_BLOBS === '1' && !isNetlifyProdLike()) {
     const { getStore } = await import('./netlify-blobs-wrapper.js');
     return normalizeStore(getStore({ name }), 'local');
   }
-  const g = await loadRealGetStore();
-  if (g) {
-    try {
-      return normalizeStore(g({ name }), 'real');
-    } catch (e: any) {
-      console.warn('[quizStore] Real getStore not available, falling back:', e?.message || e);
+  try {
+    const g = resolveNetlifyGetStore();
+    return normalizeStore(g({ name }), 'real');
+  } catch (e: any) {
+    if (isNetlifyProdLike()) {
+      throw new Error(`[quizStore] Netlify Blobs is unavailable in this environment: ${e?.message || e}`);
     }
+    console.warn('[quizStore] Using local wrapper (dev/test fallback):', e?.message || e);
+    const { getStore } = await import('./netlify-blobs-wrapper.js');
+    return normalizeStore(getStore({ name }), 'local');
   }
-  const { getStore } = await import('./netlify-blobs-wrapper.js');
-  return normalizeStore(getStore({ name }), 'local');
 }
