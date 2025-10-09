@@ -82,7 +82,7 @@ const handleBlobsCreate = async (event: HandlerEvent) => {
 };
 
 // --- Entry Point ---
-export const handler: Handler = async (event) => {
+const handler: Handler = async (event) => {
   // Blobs 自動認証コンテキスト接続
   connectBlobsFromEvent(event as any);
 
@@ -110,4 +110,6 @@ export const handler: Handler = async (event) => {
   return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Failed to create quiz.', error: error.message }) };
   }
 };
- 
+
+export default handler;
+
