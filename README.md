@@ -164,6 +164,9 @@ node scripts/test-gemini.mjs
 - [ARCHITECTURE（技術構成）](./docs/ARCHITECTURE.md)
 - [ROADMAP（開発計画）](./docs/ROADMAP.md)
 - [Netlify Blobs 実践ガイド](./docs/NETLIFY_BLOBS_GUIDE.md)
+- [出荷チェックリスト（Blobs）](./docs/CHECKLIST-BLOBS-RELEASE.md)
+- [CHANGELOG](./CHANGELOG.md)
+- [Milestone: 2025-10 Base](./docs/MILESTONE-2025-10-BASE.md)
 
 ---
 
