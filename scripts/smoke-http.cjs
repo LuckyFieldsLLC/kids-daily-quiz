@@ -63,18 +63,28 @@ async function main() {
   try { createdId = JSON.parse(c.text).id; } catch {}
   if (!createdId) throw new Error('create failed: missing id in response');
 
-  // 3) get
+  // 3) get (with retry for eventual consistency)
   log('get start');
-  const g = await request('GET', withBase(`/.netlify/functions/getQuizzes`), undefined, { 'x-storage-mode': 'netlify-blobs' });
-  log('get status', g.status, g.text);
-  if (g.status !== 200) throw new Error(`get failed: ${g.text}`);
-  try {
-    const arr = JSON.parse(g.text);
-    const exists = Array.isArray(arr) && arr.some(x => x.id === createdId);
-    if (!exists) throw new Error('created id not found in list');
-  } catch (e) {
-    throw new Error(`get verification failed: ${e?.message || e}`);
+  let g;
+  let found = false;
+  const maxAttempts = 6;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    g = await request('GET', withBase(`/.netlify/functions/getQuizzes`), undefined, { 'x-storage-mode': 'netlify-blobs' });
+    log('get status', g.status, g.text);
+    if (g.status === 200) {
+      try {
+        const arr = JSON.parse(g.text);
+        if (Array.isArray(arr) && arr.some(x => x.id === createdId)) {
+          found = true;
+          break;
+        }
+      } catch {}
+    }
+    // wait 500ms before retry
+    await new Promise(r => setTimeout(r, 500));
   }
+  if (!g || g.status !== 200) throw new Error(`get failed: ${g ? g.text : 'no response'}`);
+  if (!found) throw new Error('get verification failed: created id not found in list after retries');
 
   // 4) delete
   log('delete start');
