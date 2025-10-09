@@ -16,9 +16,12 @@ function resolveNetlifyGetStore(): ((opts: { name: string }) => any) {
 }
 
 function isNetlifyProdLike() {
-  // Netlify Functions 上では NETLIFY=true がセットされ、ローカルの netlify dev では NETLIFY_DEV=true がつく
-  // 本番/デプロイプレビュー/ブランチデプロイのような実行環境ではフォールバックを禁止する
-  return process.env.NETLIFY === 'true' && process.env.NETLIFY_DEV !== 'true';
+  // Netlify ビルド/関数実行でセットされうる環境指標を広く考慮
+  const isNetlifyFlag = process.env.NETLIFY === 'true';
+  const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.LAMBDA_TASK_ROOT;
+  const hasDeployUrl = !!process.env.DEPLOY_URL || !!process.env.URL;
+  const isDev = process.env.NETLIFY_DEV === 'true';
+  return !isDev && (isNetlifyFlag || isLambda || hasDeployUrl);
 }
 
 export async function getQuizStore() {

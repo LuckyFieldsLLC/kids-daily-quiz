@@ -16,6 +16,17 @@ export const handler: Handler = async (event) => {
 
   const steps: StepResult[] = [];
   const testKey = `diagnostic-${Date.now()}`;
+  const envFlags = {
+    NETLIFY: process.env.NETLIFY === 'true',
+    NETLIFY_DEV: process.env.NETLIFY_DEV === 'true',
+    AWS_LAMBDA_FUNCTION_NAME: !!process.env.AWS_LAMBDA_FUNCTION_NAME,
+    LAMBDA_TASK_ROOT: !!process.env.LAMBDA_TASK_ROOT,
+    URL: !!process.env.URL,
+    DEPLOY_URL: !!process.env.DEPLOY_URL,
+    // Blobs 関連のユーザー定義を使っていないか簡易確認（値そのものは返さない）
+    HAS_BLOBS_SITE_ID: !!process.env.BLOBS_SITE_ID,
+    HAS_BLOBS_TOKEN: !!process.env.BLOBS_TOKEN,
+  };
 
   try {
     // 1. ストア取得
@@ -70,6 +81,7 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         ok: steps.every(s => s.ok || s.step === 'list' || s.step === 'delete'),
         storeKind: (store as any)?.kind,
+        env: envFlags,
         steps,
       }),
     };
@@ -79,6 +91,7 @@ export const handler: Handler = async (event) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ok: false,
+        env: envFlags,
         steps,
         error: error.message,
       }),
