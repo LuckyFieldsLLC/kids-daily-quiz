@@ -1,15 +1,15 @@
 import type { Quiz } from '../../types.js';
-import { Handler } from '@netlify/functions';
+import type { HandlerEvent } from '@netlify/functions';
 import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
 
-export const handler: Handler = async (event) => {
+export const handler = async (event: HandlerEvent): Promise<Response> => {
   connectBlobsFromEvent(event as any);
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   try {
-    const newQuizzes: Quiz[] = JSON.parse(event.body || '[]');
+  const newQuizzes: Quiz[] = JSON.parse(event.body || '[]');
 
   const store = await getQuizStore();
   for (const quiz of newQuizzes) {
@@ -17,14 +17,8 @@ export const handler: Handler = async (event) => {
       await store.set(key, JSON.stringify(quiz));
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'Quizzes imported successfully' }),
-    };
+    return new Response(JSON.stringify({ message: 'Quizzes imported successfully' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error: any) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Failed to import quizzes', error: error.message }),
-    };
+    return new Response(JSON.stringify({ message: 'Failed to import quizzes', error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 };

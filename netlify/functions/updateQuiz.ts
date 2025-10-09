@@ -23,7 +23,7 @@ const handleDbUpdate = async (event: HandlerEvent) => {
   const { id, question, options, answer, is_active, difficulty, fun_level } = JSON.parse(event.body || '{}');
 
   if (!id || !question || !Array.isArray(options) || !answer) {
-    return { statusCode: 400, body: JSON.stringify({ message: 'Invalid quiz data for update.' }) };
+    return new Response(JSON.stringify({ message: 'Invalid quiz data for update.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   }
 
   const pool = getDbPool(event);
@@ -38,9 +38,9 @@ const handleDbUpdate = async (event: HandlerEvent) => {
   const { rows } = await pool.query(sql, values);
 
   if (rows.length === 0) {
-    return { statusCode: 404, body: JSON.stringify({ message: 'Quiz not found.' }) };
+    return new Response(JSON.stringify({ message: 'Quiz not found.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
   }
-  return { statusCode: 200, body: JSON.stringify(rows[0]) };
+  return new Response(JSON.stringify(rows[0]), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
 
 // (Sheets removal) 旧データはマイグレーション後 local/blobs 側で保存されます。
@@ -52,7 +52,7 @@ const handleBlobsUpdate = async (event: HandlerEvent) => {
 
   const existingRaw = await store.get(String(quizToUpdate.id));
   if (!existingRaw) {
-    return { statusCode: 404, body: JSON.stringify({ message: 'Quiz not found.' }) };
+    return new Response(JSON.stringify({ message: 'Quiz not found.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
   }
   const existingQuiz = JSON.parse(existingRaw) as Quiz;
   const updatedQuiz: Quiz = {
@@ -61,14 +61,14 @@ const handleBlobsUpdate = async (event: HandlerEvent) => {
     updated_at: new Date().toISOString(),
   };
   await store.set(String(updatedQuiz.id), JSON.stringify(updatedQuiz));
-  return { statusCode: 200, body: JSON.stringify(updatedQuiz) };
+  return new Response(JSON.stringify(updatedQuiz), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
 
 // --- Entry Point ---
-const handler = async (event: HandlerEvent) => {
+const handler = async (event: HandlerEvent): Promise<Response> => {
   connectBlobsFromEvent(event as any);
   if (event.httpMethod !== 'PUT') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return new Response('Method Not Allowed', { status: 405 });
   }
   
   const storageMode = event.headers['x-storage-mode'];
@@ -76,7 +76,7 @@ const handler = async (event: HandlerEvent) => {
   const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
   
   try {
-    let result;
+    let result: Response;
     if (isBlobs) {
       result = await handleBlobsUpdate(event);
     } else if (isDb) {
@@ -84,16 +84,13 @@ const handler = async (event: HandlerEvent) => {
     } else {
       result = await handleBlobsUpdate(event); // fallback
     }
-    return { 
-      ...result, 
-      headers: { 'Content-Type': 'application/json' } 
-    };
+    return result;
   } catch (error: any) {
     console.error("Error updating quiz:", error);
-    return { 
-      statusCode: 500, 
-      body: JSON.stringify({ message: 'Failed to update quiz.', error: error.message }) 
-    };
+    return new Response(
+      JSON.stringify({ message: 'Failed to update quiz.', error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 };
 

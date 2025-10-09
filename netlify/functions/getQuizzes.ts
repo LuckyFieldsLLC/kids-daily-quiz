@@ -1,7 +1,7 @@
 // netlify/functions/getQuizzes.ts
 import { Pool } from '@neondatabase/serverless';
 import { getGenericStore, connectBlobsFromEvent } from './quizStore.js';
-import type { Handler, HandlerEvent } from '@netlify/functions';
+import type { HandlerEvent } from '@netlify/functions';
 
 // --- DB接続 ---
 const getDbPool = (event: HandlerEvent): Pool => {
@@ -14,7 +14,7 @@ const getDbPool = (event: HandlerEvent): Pool => {
 };
 
 // --- Blobs Fetch ---
-const handleBlobsFetch = async (event: HandlerEvent) => {
+const handleBlobsFetch = async (event: HandlerEvent): Promise<Response> => {
   const userId = event.headers['x-user-id'] || 'guest';
   const store = await getGenericStore('quizzes');
   const { keys } = await store.list();
@@ -36,22 +36,22 @@ const handleBlobsFetch = async (event: HandlerEvent) => {
     return Number.isFinite(t) ? t : 0;
   };
   quizzes.sort((a, b) => ts(b) - ts(a));
-  return { statusCode: 200, body: JSON.stringify(quizzes) };
+  return new Response(JSON.stringify(quizzes), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
 
 // --- Neon DB ---
-const handleDbFetch = async (event: HandlerEvent) => {
+const handleDbFetch = async (event: HandlerEvent): Promise<Response> => {
   const pool = getDbPool(event);
   const { rows } = await pool.query('SELECT * FROM quizzes ORDER BY created_at DESC');
-  return { statusCode: 200, body: JSON.stringify(rows) };
+  return new Response(JSON.stringify(rows), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
 
 // Google Sheets support removed (deprecated)
 
 // --- Entry Point ---
-export const handler: Handler = async (event) => {
+export const handler = async (event: HandlerEvent): Promise<Response> => {
   if (event.httpMethod !== 'GET') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   connectBlobsFromEvent(event as any);
@@ -60,7 +60,7 @@ export const handler: Handler = async (event) => {
     const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
-    let result;
+    let result: Response;
     if (isBlobs) {
       result = await handleBlobsFetch(event);
     } else if (isDb) {
@@ -69,15 +69,12 @@ export const handler: Handler = async (event) => {
       result = await handleBlobsFetch(event); // fallback
     }
 
-    return { ...result, headers: { 'Content-Type': 'application/json' } };
+    return result;
   } catch (error: any) {
     console.error('Error fetching quizzes:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        message: 'Failed to fetch quizzes.',
-        error: error.message,
-      }),
-    };
+    return new Response(
+      JSON.stringify({ message: 'Failed to fetch quizzes.', error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 };

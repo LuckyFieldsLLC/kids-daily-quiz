@@ -1,4 +1,4 @@
-import type { Handler, HandlerEvent } from '@netlify/functions';
+import type { HandlerEvent } from '@netlify/functions';
 import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
 import { randomUUID } from 'crypto';
 import { Pool } from '@neondatabase/serverless';
@@ -29,7 +29,10 @@ const handleDbCreate = async (event: HandlerEvent) => {
   );
 
   if (!question || !Array.isArray(options) || options.length === 0 || !answer) {
-    return { statusCode: 400, body: JSON.stringify({ message: 'Invalid quiz data provided.' }) };
+    return new Response(JSON.stringify({ message: 'Invalid quiz data provided.' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const pool = getDbPool(event);
@@ -48,7 +51,10 @@ const handleDbCreate = async (event: HandlerEvent) => {
   ];
 
   const { rows } = await pool.query(sql, values);
-  return { statusCode: 201, body: JSON.stringify(rows[0]) };
+  return new Response(JSON.stringify(rows[0]), {
+    status: 201,
+    headers: { 'Content-Type': 'application/json' },
+  });
 };
 
 // (Sheets removal note) 旧データは既に local へ自動フォールバックされます。
@@ -78,16 +84,19 @@ const handleBlobsCreate = async (event: HandlerEvent) => {
   };
 
   await store.set(String(newQuiz.id), JSON.stringify(newQuiz));
-  return { statusCode: 201, body: JSON.stringify(newQuiz) };
+  return new Response(JSON.stringify(newQuiz), {
+    status: 201,
+    headers: { 'Content-Type': 'application/json' },
+  });
 };
 
 // --- Entry Point ---
-const handler: Handler = async (event) => {
+const handler = async (event: HandlerEvent): Promise<Response> => {
   // Blobs 自動認証コンテキスト接続
   connectBlobsFromEvent(event as any);
 
   if (event.httpMethod !== 'POST') {
-  return { statusCode: 405, body: 'Method Not Allowed' };
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   const storageMode = event.headers['x-storage-mode'];
@@ -95,7 +104,7 @@ const handler: Handler = async (event) => {
   const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
-    let result: { statusCode: number; body: string };
+  let result: Response;
     if (isBlobs) {
       result = await handleBlobsCreate(event);
     } else if (isDb) {
@@ -104,10 +113,13 @@ const handler: Handler = async (event) => {
       // fallback local <-> currently local means no server persistent store, reuse blobs fallback
       result = await handleBlobsCreate(event);
     }
-  return { statusCode: result.statusCode, headers: { 'Content-Type': 'application/json' }, body: result.body };
+    return result;
   } catch (error: any) {
     console.error('Error creating quiz:', error);
-  return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Failed to create quiz.', error: error.message }) };
+    return new Response(
+      JSON.stringify({ message: 'Failed to create quiz.', error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 };
 

@@ -1,7 +1,7 @@
 import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
-import type { Handler } from '@netlify/functions';
+import type { HandlerEvent } from '@netlify/functions';
 
-export const handler: Handler = async (event) => {
+export const handler = async (event: HandlerEvent): Promise<Response> => {
   connectBlobsFromEvent(event as any);
   try {
   const store = await getQuizStore();
@@ -27,16 +27,9 @@ export const handler: Handler = async (event) => {
       ),
     ].join('\n');
 
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'text/csv' },
-      body: csv,
-    };
+    return new Response(csv, { status: 200, headers: { 'Content-Type': 'text/csv' } });
   } catch (error: any) {
     console.error('Error exporting answers:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Failed to export answers', error: error.message }),
-    };
+    return new Response(JSON.stringify({ message: 'Failed to export answers', error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 };

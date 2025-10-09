@@ -21,7 +21,7 @@ const getDbPool = (event: HandlerEvent): Pool => {
 const handleDbDelete = async (event: HandlerEvent) => {
   const { id } = JSON.parse(event.body || '{}');
   if (!id) {
-    return { statusCode: 400, body: JSON.stringify({ message: 'Quiz ID is required for deletion.' }) };
+    return new Response(JSON.stringify({ message: 'Quiz ID is required for deletion.' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   }
 
   const pool = getDbPool(event);
@@ -29,9 +29,9 @@ const handleDbDelete = async (event: HandlerEvent) => {
   const result = await pool.query(sql, [id]);
 
   if (result.rowCount === 0) {
-    return { statusCode: 404, body: JSON.stringify({ message: 'Quiz not found for deletion.' }) };
+    return new Response(JSON.stringify({ message: 'Quiz not found for deletion.' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
   }
-  return { statusCode: 200, body: JSON.stringify({ message: `Quiz ${id} deleted successfully.` }) };
+  return new Response(JSON.stringify({ message: `Quiz ${id} deleted successfully.` }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
 
 // (Sheets removal note) 旧モード利用データは移行後 Blobs/DB 運用
@@ -40,18 +40,18 @@ const handleDbDelete = async (event: HandlerEvent) => {
 const handleBlobsDelete = async (event: HandlerEvent) => {
   const { id } = JSON.parse(event.body || '{}');
   if (!id) {
-    return { statusCode: 400, body: JSON.stringify({ message: 'ID is required' }) };
+    return new Response(JSON.stringify({ message: 'ID is required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   }
   const store = await getQuizStore();
   await store.delete(String(id));
-  return { statusCode: 200, body: JSON.stringify({ message: 'Quiz deleted successfully' }) };
+  return new Response(JSON.stringify({ message: 'Quiz deleted successfully' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 };
 
 // --- Entry Point ---
-const handler = async (event: HandlerEvent) => {
+const handler = async (event: HandlerEvent): Promise<Response> => {
   connectBlobsFromEvent(event as any);
   if (event.httpMethod !== 'POST' && event.httpMethod !== 'DELETE') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   const storageMode = event.headers['x-storage-mode'];
@@ -59,7 +59,7 @@ const handler = async (event: HandlerEvent) => {
   const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
-    let result;
+    let result: Response;
     if (isBlobs) {
       result = await handleBlobsDelete(event);
     } else if (isDb) {
@@ -67,16 +67,13 @@ const handler = async (event: HandlerEvent) => {
     } else {
       result = await handleBlobsDelete(event); // fallback
     }
-    return {
-      ...result,
-      headers: { 'Content-Type': 'application/json' },
-    };
+    return result;
   } catch (error: any) {
     console.error("Error deleting quiz:", error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Failed to delete quiz.', error: error.message }),
-    };
+    return new Response(
+      JSON.stringify({ message: 'Failed to delete quiz.', error: error.message }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 };
 

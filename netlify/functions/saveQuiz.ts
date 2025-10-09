@@ -1,29 +1,23 @@
 import type { Quiz } from '../../types.js';
 import { getQuizStore } from './quizStore.js';
 import { connectBlobsFromEvent } from './quizStore.js';
-import type { Handler } from '@netlify/functions';
+import type { HandlerEvent } from '@netlify/functions';
 
-export const handler: Handler = async (event) => {
+export const handler = async (event: HandlerEvent): Promise<Response> => {
   if (event.httpMethod !== 'POST' && event.httpMethod !== 'PUT') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   connectBlobsFromEvent(event as any);
   try {
-    const quiz = JSON.parse(event.body || '{}') as Quiz;
-    if (!quiz.id) return { statusCode: 400, body: 'Quiz must have id' };
+  const quiz = JSON.parse(event.body || '{}') as Quiz;
+  if (!quiz.id) return new Response('Quiz must have id', { status: 400 });
 
   const store = await getQuizStore();
   await store.set(String(quiz.id), JSON.stringify(quiz));
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'Quiz saved', quiz }),
-    };
+    return new Response(JSON.stringify({ message: 'Quiz saved', quiz }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error: any) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Failed to save quiz', error: error.message }),
-    };
+    return new Response(JSON.stringify({ message: 'Failed to save quiz', error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 };
