@@ -95,7 +95,7 @@ const handler = async (event: HandlerEvent): Promise<Response> => {
   // Blobs 自動認証コンテキスト接続
   connectBlobsFromEvent(event as any);
 
-  if (event.httpMethod !== 'POST') {
+  if (event.httpMethod !== 'POST' && event.httpMethod !== 'GET') {
     return new Response(
       JSON.stringify({ message: 'Method Not Allowed', got: event.httpMethod, headers: event.headers }),
       { status: 405, headers: { 'Content-Type': 'application/json' } }
@@ -107,6 +107,9 @@ const handler = async (event: HandlerEvent): Promise<Response> => {
   const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
+    if (event.httpMethod === 'GET') {
+      return new Response(JSON.stringify({ ok: true, message: 'createQuiz alive' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
   let result: Response;
     if (isBlobs) {
       result = await handleBlobsCreate(event);
