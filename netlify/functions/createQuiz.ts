@@ -1,4 +1,4 @@
-import type { HandlerEvent } from '@netlify/functions';
+import type { Handler, HandlerEvent } from '@netlify/functions';
 import { getQuizStore, connectBlobsFromEvent } from './quizStore.js';
 import { randomUUID } from 'crypto';
 import { Pool } from '@neondatabase/serverless';
@@ -82,12 +82,12 @@ const handleBlobsCreate = async (event: HandlerEvent) => {
 };
 
 // --- Entry Point ---
-const handler = async (event: HandlerEvent) => {
+export const handler: Handler = async (event) => {
   // Blobs 自動認証コンテキスト接続
   connectBlobsFromEvent(event as any);
 
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+  return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
   const storageMode = event.headers['x-storage-mode'];
@@ -95,7 +95,7 @@ const handler = async (event: HandlerEvent) => {
   const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
-    let result;
+    let result: { statusCode: number; body: string };
     if (isBlobs) {
       result = await handleBlobsCreate(event);
     } else if (isDb) {
@@ -104,17 +104,10 @@ const handler = async (event: HandlerEvent) => {
       // fallback local <-> currently local means no server persistent store, reuse blobs fallback
       result = await handleBlobsCreate(event);
     }
-    return {
-      ...result,
-      headers: { 'Content-Type': 'application/json' },
-    };
+  return { statusCode: result.statusCode, headers: { 'Content-Type': 'application/json' }, body: result.body };
   } catch (error: any) {
     console.error('Error creating quiz:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ message: 'Failed to create quiz.', error: error.message }),
-    };
+  return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: 'Failed to create quiz.', error: error.message }) };
   }
 };
-
-export default handler;
+ 
