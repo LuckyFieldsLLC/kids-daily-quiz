@@ -19,15 +19,34 @@ const handleBlobsFetch = async (event: HandlerEvent): Promise<Response> => {
   const store = await getGenericStore('quizzes');
   const { keys } = await store.list();
   const quizzes: any[] = [];
+
+  // UUID v4 の形式に一致するキーのみを対象とする
+  const uuidV4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   for (const key of keys) {
-    // クイズIDのprefix判定は不要 or 必要ならここで
+    if (!uuidV4.test(String(key))) {
+      // 旧テスト用の "hello" などJSONではない可能性のあるキーはスキップ
+      continue;
+    }
+
     const raw = await store.get(key);
     if (!raw) continue;
-    const data = JSON.parse(raw);
-    // スコアを合成
+    let data: any;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      // JSONでなければスキップ
+      continue;
+    }
+
+    // スコアを合成（壊れたJSONでも安全にデフォルトへ）
     const scoreKey = `score-${userId}-${key}`;
     const scoreRaw = await store.get(scoreKey);
-    const score = scoreRaw ? JSON.parse(scoreRaw) : { correct: 0, total: 0 };
+    let score = { correct: 0, total: 0 } as any;
+    if (scoreRaw) {
+      try { score = JSON.parse(scoreRaw); } catch {}
+    }
+
     quizzes.push({ key, ...data, score });
   }
   const ts = (q: any) => {
