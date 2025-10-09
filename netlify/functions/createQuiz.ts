@@ -96,7 +96,10 @@ const handler = async (event: HandlerEvent): Promise<Response> => {
   connectBlobsFromEvent(event as any);
 
   if (event.httpMethod !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405 });
+    return new Response(
+      JSON.stringify({ message: 'Method Not Allowed', got: event.httpMethod, headers: event.headers }),
+      { status: 405, headers: { 'Content-Type': 'application/json' } }
+    );
   }
 
   const storageMode = event.headers['x-storage-mode'];
