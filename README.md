@@ -288,18 +288,101 @@ POST {
 
 ---
 
-## 🗂 ストレージ & Netlify Blobs
+## 🗂 ストレージアーキテクチャ（簡素化後）
 
-現在既定: `localStorage` (キー: `local_quizzes`, `app_settings` など)。
+現在は 3 モードに整理されました:
 
-Blobs 移行方針 (段階的):
-1. Quiz 保存時に JSON を Blob key: `quiz/<id>.json` で PUT
-2. 一覧取得は `list()` → メタデータ + 必要時 lazy fetch
-3. 認証/APIキー分離: Serverless Function 内のみ書き込み許可
+| モード | 値 | 用途 | 特長 |
+|--------|----|------|------|
+| ローカル | `local` | 個人端末内テスト | セットアップ不要 / 端末間共有不可 |
+| Netlify Blobs | `blobs` | 小〜中規模の永続化 | サーバレスK/V, JSONそのまま保存, 高速 / 簡易 |
+| Database | `db` | 将来の分析/集計 | PostgreSQL (Neon等) を想定 |
 
-運用上の注意:
-- 大量クイズ時は list コスト対策で index キャッシュを別 Blob に維持
-- バージョン管理が必要になれば diff を別キーに保存
+### 旧モードとの対応（自動マイグレーション）
+
+| 旧値 | 新モード | 備考 |
+|------|----------|------|
+| `netlify-blobs` | `blobs` | そのまま移行 |
+| `production` / `trial` / `custom` | `db` | Neon / Netlify DB / 任意 Postgres を包含 |
+| `google-sheets` | `local` | Sheets サポートは実験終了（必要になれば別プラグイン化） |
+
+`utils/settingsManager.ts` の `loadSettings()` 内で上記の正規化が行われ、UI は常に 3 値のみを提示します。
+
+### アクセスファクトリ `quizStore`
+
+`netlify/functions/quizStore.ts` は、Netlify Functions の実行環境で `@netlify/blobs` を自動認証で利用し、未構成やローカル開発ではローカルファイルベース擬似ストア (`netlify-blobs-wrapper`) に自動フォールバックします。これにより:
+
+- ローカル開発: 追加設定不要で `.blobs/` ディレクトリに JSON 保存 (擬似)
+- 本番/プレビュー: サイトで Blobs を有効化してデプロイすれば自動でリアル Blobs を利用
+- コード切替なし / import 先を統一 (`getQuizStore`, `getGenericStore`)
+
+#### list() 戻り値の差異と正規化
+
+`@netlify/blobs` のバージョンによって `store.list()` の戻り値が以下 2 パターン存在します:
+
+1. `{ keys: string[] }`
+2. `{ blobs: [{ key: string, ... }] }`
+
+本リポジトリの `quizStore` はラッパでどちらも `{ keys: string[] }` に正規化します。未知の形の場合は警告を出しつつ空配列を返します (クラッシュ回避優先)。
+
+#### トラブルシュート (Blobs)
+
+| 症状 | 原因候補 | 対策 |
+|------|----------|------|
+| list() で 500 / 例外 | API 仕様差異で `blobs` 配列を想定していない古いコード | 現行バージョンへ更新 (本ラッパ導入済なら解消) |
+| 常にローカル保存になる | サイトで Blobs 機能が未有効 / デプロイ反映漏れ | Site settings の Blobs を有効にし、Clear cache and deploy site |
+| キーは見えるが値が null | 保存時に JSON 文字列化されていない / 破損 | `saveQuiz` 等で例外ログが無いか確認 / 手動削除して再保存 |
+| パフォーマンス低下 (大量キー) | `list()` 全走査 | インデックスキー (`quizzes-index.json`) キャッシュ導入を今後検討 |
+
+> NOTE: ローカル擬似ストアは開発用で排他制御を行っていません。並列テストが激しく同一キーを書き換える場合、ごくまれに race で一時的な読み出し失敗が発生する可能性があります。
+
+#### テスト実行が「止まった」ように見える場合
+
+多くは I/O 待ち / 並列ワーカー消化中です。以下で切り分けできます:
+
+```
+npm run test:serial     # 1 ワーカーで実行 (競合切り分け)
+npm run test:handles    # 未解放ハンドル検出
+```
+
+`test:handles` でソケット / タイマー などが表示されたら、そのテストで明示的に close / clear してください。
+
+### 接続診断 Function
+
+`/.netlify/functions/diagnoseBlobs` (GET) を叩くと以下を実行し JSON で返します:
+
+1. ストア取得 (`getGenericStore('connection-test')`)
+2. 書き込み (一時キー)
+3. 読み出し
+4. list()
+5. 削除
+
+レスポンス例:
+```json
+{
+   "ok": true,
+   "env": { "hasSiteId": true, "hasToken": true, "envReady": true },
+   "mode": "real-or-fallback",
+   "steps": [ { "step": "getStore", "ok": true }, ... ]
+}
+```
+
+### Function 側の互換処理
+
+各 CRUD / testConnection Function は `x-storage-mode` ヘッダで以下を同義として扱います:
+
+| 互換入力 | 判定 | 実際の処理 |
+|----------|------|------------|
+| `netlify-blobs` / `blobs` | Blobs | `quizStore` 経由 |
+| `production` / `trial` / `custom` / `db` | DB | Neon/Postgres 経由 |
+| その他 | Fallback | Blobs (擬似含む) |
+
+### 今後の最適化アイデア
+
+- Blobs: 大量キーでの `list()` コストを避けるため、インデックスキャッシュ (例: `quizzes-index.json`)
+- DB: マイグレーションスクリプト / Prisma 導入検討（スキーマ進化時）
+- 暗号化: 機微データ導入時にクライアントサイド暗号化 → Blob 保存
+- TTL / アーカイブ: 古いクイズを別名前空間へ移動
 
 ---
 
@@ -321,7 +404,25 @@ npm run test:e2e:update
 
 ---
 
-## 🖼 アイコン方針
+## � 接続テスト: `testConnection` vs `diagnoseBlobs`
+
+| 項目 | `/.netlify/functions/testConnection` | `/.netlify/functions/diagnoseBlobs` |
+|------|--------------------------------------|--------------------------------------|
+| HTTP | POST | GET |
+| 用途 | クイック疎通 (Blobs/DB) | 詳細診断 (主に Blobs) |
+| ストレージ操作 | list もしくは SELECT NOW() 程度 | write -> read -> list -> delete 連鎖 |
+| 環境変数チェック | 簡易 (有無によるメッセージ) | `hasSiteId` / `hasToken` / fallback 判定 |
+| 失敗時 | 単純なメッセージ | 各 step ごとの `ok`/error 集約 |
+| 想定トリガ | UI 設定画面の「接続テスト」ボタン | デプロイ後のトラブル解析 / サポート調査 |
+
+利用指針:
+- 通常ユーザー: 設定モーダルから POST のみで十分。
+- 運用/開発者: Blobs 挙動がおかしい時に GET の詳細を参照し、どのステップで失敗しているかを特定。
+- 大量キー最適化やレイテンシ分析を行う場合は diagnose に計測フィールド追加を検討（未実装）。
+
+---
+
+## �🖼 アイコン方針
 
 `@heroicons/react` (outline) 採用。理由:
 - 一貫したアクセシビリティ (title/aria-hidden 制御容易)

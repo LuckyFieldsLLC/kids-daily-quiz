@@ -1,4 +1,4 @@
-import { getStore } from "./netlify-blobs-wrapper.js";
+import { getQuizStore } from './quizStore.js';
 import type { Handler } from '@netlify/functions';
 
 export const handler: Handler = async (event) => {
@@ -11,14 +11,15 @@ export const handler: Handler = async (event) => {
     if (!quizId) return { statusCode: 400, body: 'quizId is required' };
 
 
-  const store = getStore({ name: 'quizzes' });
-  const quizRaw = await store.get(quizId);
+  const store = await getQuizStore();
+  const key = String(quizId);
+  const quizRaw = await store.get(key);
   if (!quizRaw) return { statusCode: 404, body: 'Quiz not found' };
   const quiz = JSON.parse(quizRaw);
   quiz.score = quiz.score || { correct: 0, total: 0 };
   quiz.score.total += 1;
   if (isCorrect) quiz.score.correct += 1;
-  await store.set(quizId, JSON.stringify(quiz));
+  await store.set(key, JSON.stringify(quiz));
 
     return {
       statusCode: 200,

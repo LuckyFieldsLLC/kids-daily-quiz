@@ -3,19 +3,30 @@ import { loadSettings } from '../utils/settingsManager';
 
 const API_PREFIX = '/.netlify/functions/';
 
-const getHeaders = (storageMode: StorageMode, dbConfig: DbConfig): Record<string, string> => {
+// 送信前に互換マッピング（念のため旧値を受け取った場合）
+export const normalizeMode = (mode: string): StorageMode => {
+    switch (mode) {
+        case 'netlify-blobs': return 'blobs';
+        case 'production':
+        case 'trial':
+        case 'custom': return 'db';
+        case 'google-sheets': return 'local'; // 廃止: フォールバック
+        case 'blobs':
+        case 'db':
+        case 'local':
+        default:
+            return mode as StorageMode;
+    }
+};
+
+export const getHeaders = (rawMode: StorageMode, dbConfig: DbConfig): Record<string, string> => {
+    const storageMode = normalizeMode(rawMode);
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'x-storage-mode': storageMode,
+        'x-storage-mode': storageMode === 'blobs' ? 'netlify-blobs' : (storageMode === 'db' ? 'production' : 'local'),
     };
-    // For DB modes
-    if (storageMode === 'custom' && dbConfig.dbUrl) {
+    if (storageMode === 'db' && dbConfig.dbUrl) {
         headers['x-db-url'] = dbConfig.dbUrl;
-    }
-    // For Sheets mode
-    if (storageMode === 'google-sheets') {
-        if (dbConfig.googleApiKey) headers['x-google-api-key'] = dbConfig.googleApiKey;
-        if (dbConfig.googleSheetId) headers['x-google-sheet-id'] = dbConfig.googleSheetId;
     }
     return headers;
 };
@@ -108,16 +119,7 @@ export const testDbConnection = async (dbUrl: string): Promise<{ message: string
     return handleResponse(response);
 };
 
-export const testGoogleSheetsConnection = async (apiKey: string, sheetId: string): Promise<{ message: string }> => {
-    const headers = {
-        'Content-Type': 'application/json',
-        'x-google-api-key': apiKey,
-        'x-google-sheet-id': sheetId,
-        'x-storage-mode': 'google-sheets',
-    };
-    const response = await fetch(`${API_PREFIX}testConnection`, { method: 'POST', headers });
-    return handleResponse(response);
-};
+// (Removed) Google Sheets 接続テストは廃止されました。
 
 export const testNetlifyBlobsConnection = async (): Promise<{ message: string }> => {
     const settings = loadSettings();

@@ -1,5 +1,5 @@
 // utils/settingsManager.ts
-import type { AppSettings } from '../types';
+import type { AppSettings, StorageMode } from '../types';
 
 // localStorageで使うキー名
 const SETTINGS_KEY = 'app_settings_config';
@@ -41,19 +41,42 @@ export const loadSettings = (): AppSettings => {
   try {
     const settingsString = localStorage.getItem(SETTINGS_KEY);
     if (!settingsString) return DEFAULT_SETTINGS;
+    const parsed: any = JSON.parse(settingsString);
 
-    const parsed = JSON.parse(settingsString);
+    // --- StorageMode 正規化 ---
+    const legacyMode = parsed.storageMode;
+    let normalized: StorageMode;
+    switch (legacyMode) {
+      case 'netlify-blobs':
+        normalized = 'blobs';
+        break;
+      case 'production':
+      case 'trial':
+      case 'custom':
+        normalized = 'db';
+        break;
+      case 'google-sheets':
+        console.warn('[settings] google-sheets mode deprecated → local にフォールバック');
+        normalized = 'local';
+        break;
+      case 'blobs':
+      case 'db':
+      case 'local':
+        normalized = legacyMode;
+        break;
+      default:
+        normalized = 'local';
+    }
 
-    // 不足分をデフォルトで補う
     const merged: AppSettings = {
       ...DEFAULT_SETTINGS,
       ...parsed,
+      storageMode: normalized,
       dbConfig: { ...DEFAULT_SETTINGS.dbConfig, ...(parsed.dbConfig || {}) },
       apiKeys: { ...DEFAULT_SETTINGS.apiKeys, ...(parsed.apiKeys || {}) },
       display: { ...DEFAULT_SETTINGS.display, ...(parsed.display || {}) },
       appearance: { ...DEFAULT_SETTINGS.appearance, ...(parsed.appearance || {}) },
     };
-
     return merged;
   } catch (error) {
     console.error('Failed to load settings from localStorage:', error);

@@ -1,5 +1,5 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getStore } from "./netlify-blobs-wrapper.js";
+import { getGenericStore } from './quizStore.js';
 import { Pool } from '@neondatabase/serverless';
 
 // --- Inlined from _db.ts ---
@@ -15,41 +15,7 @@ const getDbPool = (event: HandlerEvent): Pool => {
   throw new Error('Database connection string is not configured. Please set NETLIFY_DATABASE_URL or provide a custom URL.');
 };
 
-// --- Inlined from _sheets-client.ts ---
-const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
-const SHEETS_DEFAULT_RANGE = 'Sheet1!A:I';
-
-interface SheetsAuth { apiKey: string; sheetId: string; }
-
-const getSheetsAuth = (event: HandlerEvent): SheetsAuth => {
-    const apiKey = event.headers['x-google-api-key'];
-    const sheetId = event.headers['x-google-sheet-id'];
-    if (!apiKey || !sheetId) throw new Error('Google Sheets API Key and Sheet ID are required.');
-    return { apiKey, sheetId };
-};
-
-const getSheetData = async (auth: SheetsAuth) => {
-    const url = `${SHEETS_API_URL}/${auth.sheetId}/values/${SHEETS_DEFAULT_RANGE}?key=${auth.apiKey}`;
-    const response = await fetch(url);
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Failed to fetch from Google Sheets:", errorText);
-        try {
-            const errorJson = JSON.parse(errorText);
-            const googleMessage = errorJson?.error?.message || 'Unknown Google API error.';
-             if (googleMessage.includes('API key not valid')) throw new Error('Google APIキーが無効です。キーが正しいか確認してください。');
-            if (googleMessage.includes('caller does not have permission')) throw new Error('スプレッドシートへのアクセス権限がありません。「リンクを知っている全員」の共有設定が「閲覧者」になっているか確認してください。');
-            if (googleMessage.includes('Unable to parse range')) throw new Error('スプレッドシートのシート名または範囲指定が無効です。シート名が「Sheet1」であることを確認してください。');
-            if (googleMessage.includes('Requested entity was not found')) throw new Error('スプレッドシートIDが見つかりません。IDが正しいか確認してください。');
-            throw new Error(`Google APIエラー: ${googleMessage}`);
-        } catch(e: any) {
-            if (e.message.startsWith('Google') || e.message.startsWith('スプレッドシート')) throw e;
-            throw new Error('Googleスプレッドシートからのデータ取得に失敗しました。設定内容を確認してください。');
-        }
-    }
-    const data = await response.json();
-    return (data.values || []) as string[][];
-};
+// Google Sheets legacy connection test removed.
 
 // --- Original Function Logic ---
 
@@ -59,71 +25,57 @@ const handleDbTest = async (event: HandlerEvent) => {
     const client = await pool.connect();
     await client.query('SELECT NOW()');
     client.release();
-    return {
-        statusCode: 200,
-        body: JSON.stringify({ message: 'Database connection successful!' })
-    };
+  return new Response(JSON.stringify({ message: 'Database connection successful!' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 };
 
-// Sheets Logic
-const handleSheetsTest = async (event: HandlerEvent) => {
-    const auth = getSheetsAuth(event);
-    await getSheetData(auth);
-    return {
-        statusCode: 200,
-        body: JSON.stringify({ message: 'Google Sheets connection successful!' })
-    };
-};
+// (Sheets removal) test route no longer supports google-sheets.
 
 // Netlify Blobs Logic
 const handleBlobsTest = async (event: HandlerEvent) => {
-  // 環境変数 (Site側) を簡易確認: 実際のNetlify実行環境でのみ意味がある。ローカルCLIでは空の可能性があるため存在しない場合は警告文。
-  const siteId = process.env.BLOBS_SITE_ID;
-  const token = process.env.BLOBS_TOKEN;
-  const store = getStore({ name: 'connection-test' });
+  const store = await getGenericStore('connection-test');
   await store.list();
-  const meta: Record<string, any> = { simulated: !siteId || !token };
-  return {
-    statusCode: 200,
-    body: JSON.stringify({
-      message: 'Netlify Blobs connection successful!' + (meta.simulated ? ' (ローカルラッパによる擬似接続)' : ''),
-      siteConfigured: !!siteId,
-      tokenConfigured: !!token,
-      meta
-    })
-  };
+  return new Response(
+    JSON.stringify({
+      message: 'Netlify Blobs connection successful!',
+      storeKind: (store as any)?.kind,
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } }
+  );
 };
 
-export default async (event: HandlerEvent) => {
+const handler = async (event: HandlerEvent) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return new Response('Method Not Allowed', { status: 405 });
   }
 
   const storageMode = event.headers['x-storage-mode'];
+  const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
+  const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
-    let result;
-    if (storageMode === 'netlify-blobs') {
-        result = await handleBlobsTest(event);
-    } else if (storageMode === 'google-sheets') {
-        result = await handleSheetsTest(event);
+    let result: Response;
+    if (isBlobs) {
+      result = await handleBlobsTest(event);
+    } else if (isDb) {
+      result = await handleDbTest(event);
     } else {
-        result = await handleDbTest(event);
+      result = await handleBlobsTest(event); // fallback
     }
-    return {
-        ...result,
-        headers: { 'Content-Type': 'application/json' }
-    };
+    return result;
   } catch (error: any) {
     console.error("Connection test failed:", error);
     let message = 'Connection failed.';
     if (error.message.includes('Netlify Blobs is not available')) {
         message = 'Netlify Blobsを有効にしてください。サイト設定の「Blobs」から有効化できます。';
     }
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message, error: error.message }),
+    return new Response(JSON.stringify({ message, error: error.message }), {
+      status: 400,
       headers: { 'Content-Type': 'application/json' },
-    };
+    });
   }
 };
+
+export default handler;

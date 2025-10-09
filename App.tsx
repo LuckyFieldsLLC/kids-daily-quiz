@@ -188,6 +188,20 @@ const App: React.FC = () => {
     }
     const stored = getSettings();
     if (stored) {
+      const beforeMode = (stored as any).storageModeOriginal || stored.storageMode; // fallback
+      // loadSettings で既にマイグレーションしている場合との比較: 旧値痕跡を localStorage 内 raw から抽出
+      try {
+        const raw = localStorage.getItem('app_settings');
+        if (raw) {
+          const rawParsed = JSON.parse(raw);
+          const rawMode = rawParsed.storageMode;
+          if (rawMode && ['netlify-blobs','production','trial','custom','google-sheets'].includes(rawMode)) {
+            addToast(`旧ストレージモード "${rawMode}" は新モードへ自動移行されました。`, 'success');
+            // raw を新しい正規化済みに書き戻す
+            localStorage.setItem('app_settings', JSON.stringify({ ...rawParsed, storageMode: stored.storageMode }));
+          }
+        }
+      } catch { /* ignore */ }
       setSettings({ ...defaultSettings, ...stored, appearance: { ...defaultSettings.appearance, ...stored.appearance }, apiKeys: { ...defaultSettings.apiKeys, ...stored.apiKeys } });
     }
   }, []);

@@ -13,12 +13,18 @@ export interface SpeakOptions {
 const clamp = (val: number, min: number, max: number) => Math.min(max, Math.max(min, val));
 
 export function isSupported(): boolean {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  if (typeof window === 'undefined') return false;
+  const synth: any = (window as any).speechSynthesis;
+  const Utter: any = (window as any).SpeechSynthesisUtterance;
+  // synth should be object with speak/cancel functions, Utter should be constructible
+  const synthOk = !!synth && typeof synth.speak === 'function' && typeof synth.cancel === 'function';
+  const utterOk = typeof Utter === 'function';
+  return synthOk && utterOk;
 }
 
 export function cancel() {
   if (!isSupported()) return;
-  window.speechSynthesis.cancel();
+  (window as any).speechSynthesis.cancel();
 }
 
 export function speak(text: string, opts: SpeakOptions = {}) {

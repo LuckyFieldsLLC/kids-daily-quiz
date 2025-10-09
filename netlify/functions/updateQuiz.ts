@@ -1,6 +1,6 @@
 import type { NewQuiz, Quiz } from '../../types.js';
 import type { HandlerEvent } from '@netlify/functions';
-import { getStore } from "./netlify-blobs-wrapper.js";
+import { getQuizStore } from './quizStore.js';
 import { Pool } from '@neondatabase/serverless';
 
 // --- Inlined from _db.ts ---
@@ -16,44 +16,7 @@ const getDbPool = (event: HandlerEvent): Pool => {
   throw new Error('Database connection string is not configured. Please set NETLIFY_DATABASE_URL or provide a custom URL.');
 };
 
-// --- Inlined from _sheets-client.ts ---
-const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
-const SHEETS_DEFAULT_RANGE = 'Sheet1!A:I';
-
-interface SheetsAuth { apiKey: string; sheetId: string; }
-
-const getSheetsAuth = (event: HandlerEvent): SheetsAuth => {
-  const apiKey = event.headers['x-google-api-key'];
-  const sheetId = event.headers['x-google-sheet-id'];
-  if (!apiKey || !sheetId) throw new Error('Google Sheets API Key and Sheet ID are required.');
-  return { apiKey, sheetId };
-};
-
-const getSheetData = async (auth: SheetsAuth) => {
-  const url = `${SHEETS_API_URL}/${auth.sheetId}/values/${SHEETS_DEFAULT_RANGE}?key=${auth.apiKey}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google Sheets API Error: ${errorText}`);
-  }
-  const data = await response.json();
-  return (data.values || []) as string[][];
-};
-
-const quizToRow = (quiz: Partial<Quiz>): string[] => {
-  const now = new Date().toISOString();
-  return [
-    quiz.id?.toString() || '',
-    quiz.question || '',
-    JSON.stringify(quiz.options || []),
-    quiz.answer || '',
-    quiz.created_at || now,
-    now,
-    (quiz.is_active ?? true).toString().toUpperCase(),
-    (quiz.difficulty ?? 2).toString(),
-    (quiz.fun_level ?? 2).toString(),
-  ];
-};
+// --- Google Sheets support removed (deprecated) ---
 
 // --- DB Logic ---
 const handleDbUpdate = async (event: HandlerEvent) => {
@@ -80,40 +43,12 @@ const handleDbUpdate = async (event: HandlerEvent) => {
   return { statusCode: 200, body: JSON.stringify(rows[0]) };
 };
 
-// --- Sheets Logic ---
-const handleSheetsUpdate = async (event: HandlerEvent) => {
-  const auth = getSheetsAuth(event);
-  const quizToUpdate = JSON.parse(event.body || '{}') as Quiz;
-
-  const rows = await getSheetData(auth);
-  const rowIndex = rows.findIndex(row => row[0] === quizToUpdate.id.toString());
-  
-  if (rowIndex === -1) {
-    return { statusCode: 404, body: JSON.stringify({ message: 'Quiz not found' }) };
-  }
-  
-  const updatedRow = quizToRow(quizToUpdate);
-  const range = `Sheet1!A${rowIndex + 1}`;
-  const updateUrl = `${SHEETS_API_URL}/${auth.sheetId}/values/${range}?valueInputOption=USER_ENTERED&key=${auth.apiKey}`;
-
-  const response = await fetch(updateUrl, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [updatedRow] }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Google Sheets API Error: ${await response.text()}`);
-  }
-  
-  const finalQuiz = { ...quizToUpdate, updated_at: updatedRow[5] };
-  return { statusCode: 200, body: JSON.stringify(finalQuiz) };
-};
+// (Sheets removal) 旧データはマイグレーション後 local/blobs 側で保存されます。
 
 // --- Netlify Blobs Logic ---
 const handleBlobsUpdate = async (event: HandlerEvent) => {
   const quizToUpdate = JSON.parse(event.body || '{}') as Quiz;
-  const store = getStore({ name: 'quizzes' });
+  const store = await getQuizStore();
 
   const existingRaw = await store.get(String(quizToUpdate.id));
   if (!existingRaw) {
@@ -130,21 +65,23 @@ const handleBlobsUpdate = async (event: HandlerEvent) => {
 };
 
 // --- Entry Point ---
-export default async (event: HandlerEvent) => {
+const handler = async (event: HandlerEvent) => {
   if (event.httpMethod !== 'PUT') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
   
   const storageMode = event.headers['x-storage-mode'];
+  const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
+  const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
   
   try {
     let result;
-    if (storageMode === 'netlify-blobs') {
+    if (isBlobs) {
       result = await handleBlobsUpdate(event);
-    } else if (storageMode === 'google-sheets') {
-      result = await handleSheetsUpdate(event);
-    } else {
+    } else if (isDb) {
       result = await handleDbUpdate(event);
+    } else {
+      result = await handleBlobsUpdate(event); // fallback
     }
     return { 
       ...result, 
@@ -158,3 +95,5 @@ export default async (event: HandlerEvent) => {
     };
   }
 };
+
+export default handler;

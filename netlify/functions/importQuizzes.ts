@@ -1,8 +1,6 @@
 import type { Quiz } from '../../types.js';
 import { Handler } from '@netlify/functions';
-import { getStore } from "./netlify-blobs-wrapper.js";
-
-const store = getStore({ name: 'quizzes' });
+import { getQuizStore } from './quizStore.js';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -12,7 +10,8 @@ export const handler: Handler = async (event) => {
   try {
     const newQuizzes: Quiz[] = JSON.parse(event.body || '[]');
 
-    for (const quiz of newQuizzes) {
+  const store = await getQuizStore();
+  for (const quiz of newQuizzes) {
       const key = String(quiz.id);
       await store.set(key, JSON.stringify(quiz));
     }

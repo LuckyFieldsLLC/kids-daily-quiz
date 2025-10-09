@@ -1,5 +1,5 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getStore } from "./netlify-blobs-wrapper.js";
+import { getQuizStore } from './quizStore.js';
 import { Pool } from '@neondatabase/serverless';
 
 // --- Inlined from _db.ts ---
@@ -15,29 +15,7 @@ const getDbPool = (event: HandlerEvent): Pool => {
   throw new Error('Database connection string is not configured. Please set NETLIFY_DATABASE_URL or provide a custom URL.');
 };
 
-// --- Inlined from _sheets-client.ts ---
-const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
-const SHEETS_DEFAULT_RANGE = 'Sheet1!A:I';
-
-interface SheetsAuth { apiKey: string; sheetId: string; }
-
-const getSheetsAuth = (event: HandlerEvent): SheetsAuth => {
-  const apiKey = event.headers['x-google-api-key'];
-  const sheetId = event.headers['x-google-sheet-id'];
-  if (!apiKey || !sheetId) throw new Error('Google Sheets API Key and Sheet ID are required.');
-  return { apiKey, sheetId };
-};
-
-const getSheetData = async (auth: SheetsAuth) => {
-  const url = `${SHEETS_API_URL}/${auth.sheetId}/values/${SHEETS_DEFAULT_RANGE}?key=${auth.apiKey}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google Sheets API Error: ${errorText}`);
-  }
-  const data = await response.json();
-  return (data.values || []) as string[][];
-};
+// --- Google Sheets support removed (deprecated) ---
 
 // --- DB Logic ---
 const handleDbDelete = async (event: HandlerEvent) => {
@@ -56,37 +34,7 @@ const handleDbDelete = async (event: HandlerEvent) => {
   return { statusCode: 200, body: JSON.stringify({ message: `Quiz ${id} deleted successfully.` }) };
 };
 
-// --- Sheets Logic ---
-const handleSheetsDelete = async (event: HandlerEvent) => {
-  const auth = getSheetsAuth(event);
-  const { id } = JSON.parse(event.body || '{}');
-  if (!id) {
-    return { statusCode: 400, body: JSON.stringify({ message: 'ID is required' }) };
-  }
-
-  const rows = await getSheetData(auth);
-  const rowIndex = rows.findIndex(row => row[0] === id.toString());
-
-  if (rowIndex === -1) {
-    return { statusCode: 404, body: JSON.stringify({ message: 'Quiz not found' }) };
-  }
-
-  const sheetRowNumber = rowIndex + 1;
-  const range = `Sheet1!A${sheetRowNumber}:I${sheetRowNumber}`;
-
-  const clearUrl = `${SHEETS_API_URL}/${auth.sheetId}/values/${range}:clear?key=${auth.apiKey}`;
-
-  const response = await fetch(clearUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Google Sheets API Error: ${await response.text()}`);
-  }
-  return { statusCode: 200, body: JSON.stringify({ message: 'Quiz deleted successfully' }) };
-};
+// (Sheets removal note) 旧モード利用データは移行後 Blobs/DB 運用
 
 // --- Netlify Blobs Logic ---
 const handleBlobsDelete = async (event: HandlerEvent) => {
@@ -94,27 +42,29 @@ const handleBlobsDelete = async (event: HandlerEvent) => {
   if (!id) {
     return { statusCode: 400, body: JSON.stringify({ message: 'ID is required' }) };
   }
-  const store = getStore({ name: 'quizzes' });
+  const store = await getQuizStore();
   await store.delete(String(id));
   return { statusCode: 200, body: JSON.stringify({ message: 'Quiz deleted successfully' }) };
 };
 
 // --- Entry Point ---
-export default async (event: HandlerEvent) => {
+const handler = async (event: HandlerEvent) => {
   if (event.httpMethod !== 'DELETE') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
   const storageMode = event.headers['x-storage-mode'];
+  const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
+  const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
     let result;
-    if (storageMode === 'netlify-blobs') {
+    if (isBlobs) {
       result = await handleBlobsDelete(event);
-    } else if (storageMode === 'google-sheets') {
-      result = await handleSheetsDelete(event);
-    } else {
+    } else if (isDb) {
       result = await handleDbDelete(event);
+    } else {
+      result = await handleBlobsDelete(event); // fallback
     }
     return {
       ...result,
@@ -128,4 +78,6 @@ export default async (event: HandlerEvent) => {
     };
   }
 };
+
+export default handler;
 

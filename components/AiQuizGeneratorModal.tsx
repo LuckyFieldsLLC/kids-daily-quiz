@@ -62,6 +62,7 @@ const AiQuizGeneratorModal: React.FC<Props> = ({ onClose, onQuizGenerated }) => 
       open={true}
       onOpenChange={(v) => { if (!v) onClose(); }}
       title="🧠 AIクイズ自動生成"
+      description="AIパラメータを調整してクイズを自動生成します。"
       widthClass="max-w-md"
       footer={(
         <div className="flex justify-end gap-2">

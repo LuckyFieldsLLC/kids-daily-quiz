@@ -23,7 +23,11 @@ export default defineConfig(({ mode }) => {
         environment: 'jsdom',
         globals: true,
         setupFiles: ['./tests/setup.ts'],
-        include: ['tests/**/*.test.{ts,tsx}'], // 明示的に当プロジェクトのテストだけ
+  // 単一ファイル実行時のパターンマッチ不発 (Windows + 特定 Vitest バージョン) 緩和のため
+  include: ['tests/**/*.{test,spec}.{ts,tsx}'], // Windows でも安定しやすい一般形
+        testTimeout: 30000,       // 個々のテスト上限 (ms)
+        hookTimeout: 15000,       // before/after フック上限 (ms)
+        slowTestThreshold: 2000,  // 2s 超で slow ハイライト
         exclude: [
           'tests/e2e/**', // Playwright 用
           'node_modules/**', // 依存パッケージ内の *.test.* を無視

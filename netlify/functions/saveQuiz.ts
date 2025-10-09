@@ -1,5 +1,5 @@
 import type { Quiz } from '../../types.js';
-import { getStore } from "./netlify-blobs-wrapper.js";
+import { getQuizStore } from './quizStore.js';
 import type { Handler } from '@netlify/functions';
 
 export const handler: Handler = async (event) => {
@@ -11,8 +11,8 @@ export const handler: Handler = async (event) => {
     const quiz = JSON.parse(event.body || '{}') as Quiz;
     if (!quiz.id) return { statusCode: 400, body: 'Quiz must have id' };
 
-      const store = getStore({ name: 'quizzes' });
-      await store.set(String(quiz.id), JSON.stringify(quiz));
+  const store = await getQuizStore();
+  await store.set(String(quiz.id), JSON.stringify(quiz));
 
     return {
       statusCode: 200,

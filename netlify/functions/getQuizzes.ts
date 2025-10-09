@@ -1,6 +1,6 @@
 // netlify/functions/getQuizzes.ts
 import { Pool } from '@neondatabase/serverless';
-import { getStore } from "./netlify-blobs-wrapper.js";
+import { getGenericStore } from './quizStore.js';
 import type { Handler, HandlerEvent } from '@netlify/functions';
 
 // --- DB接続 ---
@@ -16,7 +16,7 @@ const getDbPool = (event: HandlerEvent): Pool => {
 // --- Blobs Fetch ---
 const handleBlobsFetch = async (event: HandlerEvent) => {
   const userId = event.headers['x-user-id'] || 'guest';
-  const store = getStore({ name: 'quizzes' });
+  const store = await getGenericStore('quizzes');
   const { keys } = await store.list();
   const quizzes: any[] = [];
   for (const key of keys) {
@@ -30,7 +30,12 @@ const handleBlobsFetch = async (event: HandlerEvent) => {
     const score = scoreRaw ? JSON.parse(scoreRaw) : { correct: 0, total: 0 };
     quizzes.push({ key, ...data, score });
   }
-  quizzes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const ts = (q: any) => {
+    const v = q.created_at ?? q.createdAt;
+    const t = v ? Date.parse(v) : NaN;
+    return Number.isFinite(t) ? t : 0;
+  };
+  quizzes.sort((a, b) => ts(b) - ts(a));
   return { statusCode: 200, body: JSON.stringify(quizzes) };
 };
 
@@ -41,8 +46,7 @@ const handleDbFetch = async (event: HandlerEvent) => {
   return { statusCode: 200, body: JSON.stringify(rows) };
 };
 
-// --- Sheets（必要なら残す） ---
-// …省略（今のコードを流用）
+// Google Sheets support removed (deprecated)
 
 // --- Entry Point ---
 export const handler: Handler = async (event) => {
@@ -50,18 +54,18 @@ export const handler: Handler = async (event) => {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
-  const storageMode = event.headers['x-storage-mode'];
+    const storageMode = event.headers['x-storage-mode'];
+    const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
+    const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
     let result;
-    if (storageMode === 'netlify-blobs') {
+    if (isBlobs) {
       result = await handleBlobsFetch(event);
-    } else if (storageMode === 'google-sheets') {
-      // Sheets fetchを残す場合
-      // result = await handleSheetsFetch(event);
-      throw new Error('Sheets mode not implemented in this version');
-    } else {
+    } else if (isDb) {
       result = await handleDbFetch(event);
+    } else {
+      result = await handleBlobsFetch(event); // fallback
     }
 
     return { ...result, headers: { 'Content-Type': 'application/json' } };

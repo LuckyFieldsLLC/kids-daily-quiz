@@ -1,11 +1,11 @@
-import { getStore } from "./netlify-blobs-wrapper.js";
+import { getQuizStore } from './quizStore.js';
 import type { Handler } from '@netlify/functions';
 
 export const handler: Handler = async () => {
   try {
-    const store = getStore({ name: 'quizzes' });
+  const store = await getQuizStore();
     const { keys } = await store.list();
-    const quizzes = await Promise.all(keys.map(async (key) => {
+  const quizzes = await Promise.all(keys.map(async (key: string) => {
       const raw = await store.get(key);
       return raw ? JSON.parse(raw) : null;
     }));

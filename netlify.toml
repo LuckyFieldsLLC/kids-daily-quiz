@@ -16,3 +16,7 @@
 # --- Netlify Blobs ストア定義 ---
 [[blobs]]
   name = "quizzes"
+
+# 診断用ストア（testConnection.ts で利用）
+[[blobs]]
+  name = "connection-test"

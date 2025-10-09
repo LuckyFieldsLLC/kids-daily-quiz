@@ -1,5 +1,5 @@
 import type { HandlerEvent } from '@netlify/functions';
-import { getStore } from "./netlify-blobs-wrapper.js";
+import { getQuizStore } from './quizStore.js';
 import { randomUUID } from 'crypto';
 import { Pool } from '@neondatabase/serverless';
 import type { NewQuiz, Quiz } from '../../types.js';
@@ -19,36 +19,8 @@ const getDbPool = (event: HandlerEvent): Pool => {
   );
 };
 
-// --- Inlined from _sheets-client.ts ---
-const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
-const SHEETS_DEFAULT_RANGE = 'Sheet1';
-
-interface SheetsAuth {
-  apiKey: string;
-  sheetId: string;
-}
-
-const getSheetsAuth = (event: HandlerEvent): SheetsAuth => {
-  const apiKey = event.headers['x-google-api-key'];
-  const sheetId = event.headers['x-google-sheet-id'];
-  if (!apiKey || !sheetId) throw new Error('Google Sheets API Key and Sheet ID are required.');
-  return { apiKey, sheetId };
-};
-
-const quizToRow = (quiz: Partial<Quiz>): string[] => {
-  const now = new Date().toISOString();
-  return [
-    quiz.id?.toString() || '',
-    quiz.question || '',
-    JSON.stringify(quiz.options || []),
-    quiz.answer || '',
-    quiz.created_at || now,
-    now,
-    (quiz.is_active ?? true).toString().toUpperCase(),
-    (quiz.difficulty ?? 2).toString(),
-    (quiz.fun_level ?? 2).toString(),
-  ];
-};
+// --- Google Sheets legacy support removed (deprecated) ---
+// 以前の google-sheets モードは vNEXT で削除。履歴: commit simplifying storage modes to 3.
 
 // --- DB Logic ---
 const handleDbCreate = async (event: HandlerEvent) => {
@@ -79,38 +51,12 @@ const handleDbCreate = async (event: HandlerEvent) => {
   return { statusCode: 201, body: JSON.stringify(rows[0]) };
 };
 
-// --- Sheets Logic ---
-const handleSheetsCreate = async (event: HandlerEvent) => {
-  const auth = getSheetsAuth(event);
-  const quizData = JSON.parse(event.body || '{}') as NewQuiz;
-
-  const newQuiz: Partial<Quiz> = {
-    ...quizData,
-    id: new Date().getTime().toString(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-
-  const newRow = quizToRow(newQuiz);
-  const appendUrl = `${SHEETS_API_URL}/${auth.sheetId}/values/${SHEETS_DEFAULT_RANGE}:append?valueInputOption=USER_ENTERED&key=${auth.apiKey}`;
-
-  const response = await fetch(appendUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [newRow] }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Google Sheets API Error: ${await response.text()}`);
-  }
-
-  return { statusCode: 201, body: JSON.stringify(newQuiz) };
-};
+// (Sheets removal note) 旧データは既に local へ自動フォールバックされます。
 
 // --- Netlify Blobs Logic ---
 const handleBlobsCreate = async (event: HandlerEvent) => {
   const quizData = JSON.parse(event.body || '{}') as Partial<Quiz>;
-  const store = getStore({ name: 'quizzes' });
+  const store = await getQuizStore();
 
   // 厳密なQuiz型に正規化
   const newQuiz: Quiz = {
@@ -136,21 +82,24 @@ const handleBlobsCreate = async (event: HandlerEvent) => {
 };
 
 // --- Entry Point ---
-export default async (event: HandlerEvent) => {
+const handler = async (event: HandlerEvent) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
 
   const storageMode = event.headers['x-storage-mode'];
+  const isBlobs = storageMode === 'netlify-blobs' || storageMode === 'blobs';
+  const isDb = storageMode === 'production' || storageMode === 'trial' || storageMode === 'db' || storageMode === 'custom';
 
   try {
     let result;
-    if (storageMode === 'netlify-blobs') {
+    if (isBlobs) {
       result = await handleBlobsCreate(event);
-    } else if (storageMode === 'google-sheets') {
-      result = await handleSheetsCreate(event);
-    } else {
+    } else if (isDb) {
       result = await handleDbCreate(event);
+    } else {
+      // fallback local <-> currently local means no server persistent store, reuse blobs fallback
+      result = await handleBlobsCreate(event);
     }
     return {
       ...result,
@@ -164,3 +113,5 @@ export default async (event: HandlerEvent) => {
     };
   }
 };
+
+export default handler;

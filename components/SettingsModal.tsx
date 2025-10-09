@@ -13,12 +13,9 @@ interface SettingsModalProps {
 }
 
 const storageModeOptions: { value: StorageMode; label: string; description: string }[] = [
-    { value: 'local', label: 'ローカルストレージ', description: 'データはブラウザ内に保存されます。シンプルでテストに最適です。' },
-    { value: 'netlify-blobs', label: 'Netlify Blobs', description: 'NetlifyのBlobストアにデータを保存します。Netlifyへのデプロイが必要です。' },
-    { value: 'production', label: 'Netlify DB (本番環境)', description: 'Netlifyで設定された本番データベースを使用します。' },
-    { value: 'trial', label: 'Netlify DB (共有)', description: 'Netlifyの共有トライアルデータベースを使用します。' },
-    { value: 'custom', label: 'カスタムDB', description: '任意のPostgreSQL互換データベースの接続URLを指定します。' },
-    { value: 'google-sheets', label: 'Google Sheets', description: 'Googleスプレッドシートをデータベースとして使用します。' },
+  { value: 'local', label: 'ローカル', description: 'ブラウザのみ。最もシンプル。端末間共有なし。' },
+  { value: 'blobs', label: 'Netlify Blobs', description: 'ファイルライクなKey-Value永続化。SiteでBlobsを有効化すると自動認証で使えます。' },
+  { value: 'db', label: 'Database', description: 'PostgreSQL (Neon 等)。構造化・集計や将来拡張に。' }
 ];
 
 const iconOptions: { value: string; label: string }[] = [
@@ -109,58 +106,30 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, 
   }
 
   const renderStorageConfig = () => {
-    switch (settings.storageMode) {
-      case 'custom':
-        return (
-          <div className="space-y-2 mt-4 p-4 bg-gray-50 rounded-md border">
-            <label htmlFor="dbUrl" className="block text-sm font-medium text-gray-600">データベース接続URL</label>
-            <input
-              type="password"
-              id="dbUrl"
-              name="dbUrl"
-              value={settings.dbConfig.dbUrl || ''}
-              onChange={handleDbConfigChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
-              placeholder="postgresql://..."
-            />
-          </div>
-        );
-      case 'google-sheets':
-        return (
-          <div className="space-y-4 mt-4 p-4 bg-gray-50 rounded-md border">
-            <div>
-              <label htmlFor="googleApiKey" className="block text-sm font-medium text-gray-600">Google APIキー</label>
-              <input
-                type="password"
-                id="googleApiKey"
-                name="googleApiKey"
-                value={settings.dbConfig.googleApiKey || ''}
-                onChange={handleDbConfigChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
-              />
-            </div>
-            <div>
-              <label htmlFor="googleSheetId" className="block text-sm font-medium text-gray-600">スプレッドシートID</label>
-              <input
-                type="text"
-                id="googleSheetId"
-                name="googleSheetId"
-                value={settings.dbConfig.googleSheetId || ''}
-                onChange={handleDbConfigChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
-              />
-            </div>
-          </div>
-        );
-      default:
-        return null;
+    if (settings.storageMode === 'db') {
+      return (
+        <div className="space-y-2 mt-4 p-4 bg-gray-50 rounded-md border">
+          <label htmlFor="dbUrl" className="block text-sm font-medium text-gray-600">Postgres 接続URL</label>
+          <input
+            type="password"
+            id="dbUrl"
+            name="dbUrl"
+            value={settings.dbConfig.dbUrl || ''}
+            onChange={handleDbConfigChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900"
+            placeholder="postgresql://..."
+          />
+        </div>
+      );
     }
+    return null;
   };
 
-  const showConnectionTest = !['local'].includes(settings.storageMode);
+  const showConnectionTest = settings.storageMode !== 'local';
 
   return (
     <Modal open onOpenChange={(o) => { if(!o) onClose(); }} title="アプリケーション設定" widthClass="max-w-2xl"
+      description="データ保存先やAIプロバイダ、外観などアプリ全体の挙動を設定できます。保存後は一部設定が即時反映されます。"
       footer={
         <div className="flex justify-end gap-3">
           <Button variant="outline" onClick={onClose}>キャンセル</Button>
@@ -185,17 +154,15 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ currentSettings, onSave, 
                     </select>
                      <p className="text-xs text-gray-500 mt-1">{storageModeOptions.find(o => o.value === settings.storageMode)?.description}</p>
                     {renderStorageConfig()}
-                    {settings.storageMode === 'netlify-blobs' && (
+                    {settings.storageMode === 'blobs' && (
                       <div className="mt-4 text-xs bg-blue-50 border border-blue-200 rounded p-3 space-y-1 text-blue-800">
-                        <p className="font-semibold">Netlify Blobs 設定手順</p>
+                        <p className="font-semibold">Netlify Blobs の使い方</p>
                         <ol className="list-decimal list-inside space-y-0.5">
                           <li>Netlify ダッシュボード → 対象 Site → Site settings</li>
-                          <li>左メニューから <code className="px-1 bg-white rounded border">Build & Deploy</code> → <code className="px-1 bg-white rounded border">Environment</code> を開く</li>
-                          <li>環境変数 <code className="px-1 bg-white rounded border">BLOBS_SITE_ID</code> と <code className="px-1 bg-white rounded border">BLOBS_TOKEN</code> を追加（添付スクリーンショット参照）</li>
-                          <li>「Save」後、Deploys で <strong>Clear cache and deploy site</strong> を実行</li>
-                          <li>再デプロイ完了後、この画面で「接続テスト」ボタンを押下して成功を確認</li>
+                          <li>左メニュー「Build & Deploy」→「Blobs」で機能を有効化</li>
+                          <li>デプロイ後、Functions 実行環境では自動認証で利用できます</li>
                         </ol>
-                        <p className="mt-1">ローカル開発中は擬似ストア(ファイル)でテストされ <code>.blobs/</code> ディレクトリに保存されます。</p>
+                        <p className="mt-1">ローカル開発中は擬似ストア(ファイル)が使われ、<code>.blobs/</code> に保存されます。</p>
                       </div>
                     )}
                     {showConnectionTest && (

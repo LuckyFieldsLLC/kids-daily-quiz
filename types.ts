@@ -21,13 +21,10 @@ export type NewQuiz = Omit<Quiz, 'id' | 'created_at' | 'updated_at'> & {
   fun_level?: number;
 };
 
-export type StorageMode =
-  | 'local'
-  | 'netlify-blobs'
-  | 'production'
-  | 'trial'
-  | 'custom'
-  | 'google-sheets';
+// ストレージモードをシンプル化: フロント/設定 UI では 'local' | 'blobs' | 'db' のみ使用。
+// 旧値互換: 過去保存された設定に 'netlify-blobs' | 'production' | 'trial' | 'custom' | 'google-sheets' が残っていても
+// マイグレーション層で 'blobs' または 'db' に正規化する（settingsManager / 起動時補正で対応予定）。
+export type StorageMode = 'local' | 'blobs' | 'db';
 
 export interface DbConfig {
   dbUrl?: string;

@@ -48,9 +48,9 @@ describe('SettingsModal - storage & connection', () => {
     // Postgres 接続URL入力出現
     expect(screen.getByLabelText('Postgres 接続URL')).toBeInTheDocument();
 
-    // blobs に変更で説明パネル表示
+  // blobs に変更で説明パネル表示
     await user.selectOptions(select, 'blobs');
-    expect(screen.getByText(/Netlify Blobs 設定手順/)).toBeInTheDocument();
+  expect(screen.getByText(/Netlify Blobs の使い方/)).toBeInTheDocument();
 
     // 接続テストボタン表示される
     expect(screen.getByRole('button', { name: '接続テスト' })).toBeInTheDocument();
