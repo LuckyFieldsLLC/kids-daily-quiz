@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "npm run report",
+    "report": "tsx scripts/report.ts",
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
@@ -71,6 +73,7 @@
     "prettier": "^3.6.2",
     "tailwindcss": "^3.4.13",
     "ts-node": "^10.9.2",
+    "tsx": "^4.7.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.45.0",
     "vite": "^5.3.1",
