@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:ci": "node -v && npm -v && vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
@@ -24,6 +25,9 @@
     "dev:9999": "netlify dev --port 9999 --target-port 3000 --offline",
     "smoke:http:local": "cross-env SMOKE_BASE=http://localhost:9999 node scripts/smoke-http.cjs",
     "smoke:http:prod": "cross-env SMOKE_BASE=https://effortless-melba-084f86.netlify.app node scripts/smoke-http.cjs"
+  },
+  "engines": {
+    "node": ">=20 <21"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
