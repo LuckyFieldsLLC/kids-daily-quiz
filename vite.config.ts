@@ -19,6 +19,12 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         }
       },
+      build: {
+        rollupOptions: {
+          // Avoid bundling platform-specific Rollup binaries; they are optional deps resolved by npm on CI
+          external: [/^@rollup\/rollup-/]
+        }
+      },
       test: {
         environment: 'jsdom',
         globals: true,
